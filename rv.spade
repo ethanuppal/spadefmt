@@ -1,0 +1,161 @@
+use std::ports::new_mut_wire;
+use std::ports::read_mut_wire;
+use std::mem::fifo;
+
+struct port Rv<T> {
+    data: &Option<T>,
+    ready: inv &bool
+}
+
+impl<T> Rv<T> {
+    /// Decouples the producer from the consumer by inserting a buffer register between them.
+    /// This both allows producers and consumers to work in parallel, and also breaks the `ready`
+    /// combinational path
+    ///
+    /// However, this decoupling of the ready signal means that the throughput is at most 50%
+    /// of the time, so for a high throughput stream, this should not be used
+    entity buffer(self, clk: clock, rst: bool) -> Rv<T> {
+        let ds = inst new_mut_wire();
+
+        reg(clk) value reset(rst: None) = match (value, *self.data) {
+            (Some(_), _) => if inst read_mut_wire(ds) {
+                None
+            } else {
+                value
+            },
+            (None, Some(new)) => Some(new),
+            (None, None) => None
+        };
+
+        set self.ready = value.is_none();
+
+        Rv$(
+            data: &value,
+            ready: ds
+        )
+    }
+
+    /// Buffers the values using a FIFO, which can be used to cross clock domains.
+    entity fifo_buffer<#uint Depth, #uint AddrWidth>(
+        self,
+        write_clk: clock,
+        write_rst: bool,
+        read_clk: clock,
+        read_rst: bool,
+    ) -> Rv<T> {
+        let write_full = inst new_mut_wire();
+        set self.ready = !inst read_mut_wire(write_full);
+        (*self.data).inst into_rv_fifo::<Depth, AddrWidth>$(
+            write_clk, write_rst, write_full,
+            read_clk, read_rst,
+        )
+    }
+
+    entity terminate_unready(self) {
+        set self.ready = false;
+    }
+
+    entity terminate_ready(self) {
+        set self.ready = true;
+    }
+}
+
+enum U8SplitState {
+    Empty,
+    Half{val: uint<8>},
+    Full{val: uint<16>},
+}
+
+impl Rv<uint<16>> {
+    entity split_to_u8(self, clk: clock, rst: bool) -> Rv<uint<8>> {
+        let ds = inst new_mut_wire();
+
+        reg(clk) state reset(rst: U8SplitState::Empty) =
+            match (state, inst read_mut_wire(ds), *self.data) {
+                (U8SplitState::Empty, _, None) => U8SplitState::Empty,
+                (U8SplitState::Empty, true, Some(data)) => U8SplitState::Half(trunc(data >> 8)),
+                (U8SplitState::Empty, false, Some(data)) => U8SplitState::Full(data),
+                (_, false, _) => state,
+                (U8SplitState::Full(val), true, _) => U8SplitState::Half(trunc(val >> 8)),
+                (U8SplitState::Half(val), true, None) => U8SplitState::Empty,
+                (U8SplitState::Half(val), true, Some(data)) => U8SplitState::Full(data),
+            };
+
+        set self.ready = match state {
+            U8SplitState::Empty => true,
+            _ => false,
+        };
+
+        let data = match (state, *self.data) {
+            (U8SplitState::Empty, Some(upstream)) => Some(trunc(upstream)),
+            (U8SplitState::Empty, None) => None,
+            (U8SplitState::Half(value), _) => Some(value),
+            (U8SplitState::Full(value), _) => Some(trunc(value))
+        };
+
+        Rv$(
+            data: &data,
+            ready: ds
+        )
+    }
+}
+
+///////////////////////////////////////////
+//          Test harnesses
+///////////////////////////////////////////
+
+entity buffer_th(
+    clk: clock,
+    rst: bool,
+    ready: bool,
+    value: Option<uint<16>>
+) -> Option<uint<16>> {
+    let rv = Rv$(data: &value, ready: inst new_mut_wire());
+
+    let out = rv.inst buffer(clk, rst);
+    set out.ready = ready;
+    *out.data
+}
+
+entity split_to_u8_th(
+    clk: clock,
+    rst: bool,
+    ready: bool,
+    value: Option<uint<16>>
+) -> Option<uint<8>> {
+    let rv = Rv$(data: &value, ready: inst new_mut_wire());
+
+    let out = rv.inst split_to_u8(clk, rst);
+    set out.ready = ready;
+    *out.data
+}
+
+impl<T> Option<T> {
+    entity into_rv_fifo<#uint Depth, #uint AddrWidth>(
+        self,
+        write_clk: clock,
+        write_rst: bool,
+        write_full: inv &bool,
+
+        read_clk: clock,
+        read_rst: bool,
+    ) -> Rv<T> {
+        let (write, read) = inst fifo::<AddrWidth, T, Depth>$(
+            write_clk,
+            write_rst,
+            read_clk,
+            read_rst
+        );
+
+        set write.write = self;
+        set write_full = *write.full;
+
+
+        Rv(
+            read.read,
+            read.ack
+        )
+    }
+}
+
+
