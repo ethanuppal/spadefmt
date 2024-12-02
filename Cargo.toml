@@ -1,0 +1,15 @@
+[package]
+name = "spadefmt"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+spade = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
+spade-parser = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
+spade-ast = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
+spade-diagnostics = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
+codespan-reporting = { git = "https://gitlab.com/spade-lang/codespan.git", branch = "master" }
+argh = "0.1.12"
+camino = "1.1.9"
+logos = "0.14.3"                                                                               # sad that spade doesn't reexport this
