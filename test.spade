@@ -1,0 +1,3 @@
+fn a() {}
+
+pipeline(4) foo(clk: clock) {}

@@ -11,8 +11,10 @@
 // details. You should have received a copy of the GNU General Public License
 // along with spadefmt. If not, see <https://www.gnu.org/licenses/>.
 
+#![forbid(unsafe_code)]
+
 use std::{
-    env, fs,
+    env, fmt, fs,
     io::{self, IsTerminal, Write},
     rc::Rc,
     sync::RwLock,
@@ -21,11 +23,17 @@ use std::{
 use camino::Utf8Path;
 use codespan_reporting::{
     files::SimpleFiles,
-    term::termcolor::{Buffer, ColorChoice},
+    term::termcolor::{Buffer, BufferWriter, ColorChoice},
 };
+use inform::io::GenericIndentFormatter;
 use logos::Logos;
-use spade_diagnostics::CompilationError;
-use spadefmt::{cli::CliOpts, with_context::WithContext};
+use spadefmt::{
+    cli::CliOpts,
+    config::Config,
+    format_streams::{self, Theme},
+    render::Context,
+    with_context::WithContext,
+};
 
 fn read_file(path: &Utf8Path) -> io::Result<String> {
     let raw_contents =
@@ -35,11 +43,11 @@ fn read_file(path: &Utf8Path) -> io::Result<String> {
         .with_context("Failed to decode file contents as UTF-8")
 }
 
-fn output_buffer(opts: &CliOpts) -> Buffer {
+fn new_output_buffer(color: ColorChoice) -> Buffer {
     if !env::var("NO_COLOR").unwrap_or_default().is_empty() {
         Buffer::no_color()
     } else {
-        match opts.color.0 {
+        match color {
             ColorChoice::Always | ColorChoice::AlwaysAnsi => Buffer::ansi(),
             ColorChoice::Auto => {
                 if io::stdout().is_terminal() {
@@ -53,7 +61,7 @@ fn output_buffer(opts: &CliOpts) -> Buffer {
     }
 }
 
-fn error_handler<'a>(
+fn new_error_handler<'a>(
     error_buffer: &'a mut Buffer, file: &Utf8Path, contents: String,
 ) -> spade::ErrorHandler<'a> {
     let mut files = SimpleFiles::new();
@@ -78,7 +86,8 @@ fn driver(opts: CliOpts, error_buffer: &mut Buffer) -> io::Result<()> {
 
     let contents = read_file(&opts.file)?;
 
-    let mut errors = error_handler(error_buffer, &opts.file, contents.clone());
+    let mut errors =
+        new_error_handler(error_buffer, &opts.file, contents.clone());
 
     let mut parser = spade_parser::Parser::new(
         spade_parser::lexer::TokenKind::lexer(&contents),
@@ -86,22 +95,36 @@ fn driver(opts: CliOpts, error_buffer: &mut Buffer) -> io::Result<()> {
     );
 
     let top = parser.top_level_module_body().map_err(|error| {
-        error.report(
-            errors.error_buffer,
-            &errors.code.read().unwrap(),
-            &mut errors.diag_handler,
-        );
+        errors.report(&error);
         for error in &parser.errors {
-            error.report(
-                errors.error_buffer,
-                &errors.code.read().unwrap(),
-                &mut errors.diag_handler,
-            );
+            errors.report(error);
         }
         io::Error::other(error)
     })?;
 
-    println!("{:?}", top);
+    let test_contents = read_file("test.toml".into())?;
+    let test_config = toml::de::from_str::<Config>(&test_contents)
+        .map_err(io::Error::other)
+        .with_context("failed to decode config")?;
+
+    println!("{:?}", test_config);
+
+    let buffer_writer = BufferWriter::stdout(ColorChoice::Always);
+    let mut buffer = buffer_writer.buffer();
+
+    let f = GenericIndentFormatter::new(&mut buffer, 4);
+    let mut stream =
+        format_streams::indent_formatter::IndentFormatterStream::new(
+            Theme::idk(),
+            f,
+        );
+
+    Context::new(&mut stream, &test_config)
+        .render(&top)
+        .map_err(io::Error::other)?;
+
+    buffer_writer.print(&buffer)?;
+    println!();
 
     Ok(())
 }
@@ -121,7 +144,7 @@ fn main() -> io::Result<()> {
         return Ok(());
     }
 
-    let mut error_buffer = output_buffer(&opts);
+    let mut error_buffer = new_output_buffer(opts.color.0);
 
     driver(opts, &mut error_buffer)
         .inspect_err(|_| {
