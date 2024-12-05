@@ -160,11 +160,13 @@ impl<
         const UPPER_BOUND: usize,
         const DEFAULT: usize,
         const UNITS: String16,
-    > Into<usize>
-    for BoundedConfigUsize<LOWER_BOUND, UPPER_BOUND, DEFAULT, UNITS>
+    > From<BoundedConfigUsize<LOWER_BOUND, UPPER_BOUND, DEFAULT, UNITS>>
+    for usize
 {
-    fn into(self) -> usize {
-        self.inner
+    fn from(
+        val: BoundedConfigUsize<LOWER_BOUND, UPPER_BOUND, DEFAULT, UNITS>,
+    ) -> Self {
+        val.inner
     }
 }
 

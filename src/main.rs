@@ -14,7 +14,7 @@
 #![forbid(unsafe_code)]
 
 use std::{
-    env, fmt, fs,
+    env, fs,
     io::{self, IsTerminal, Write},
     rc::Rc,
     sync::RwLock,
@@ -25,7 +25,7 @@ use codespan_reporting::{
     files::SimpleFiles,
     term::termcolor::{Buffer, BufferWriter, ColorChoice},
 };
-use inform::io::GenericIndentFormatter;
+use inform::io::IndentWriter;
 use logos::Logos;
 use spadefmt::{
     cli::CliOpts,
@@ -107,12 +107,10 @@ fn driver(opts: CliOpts, error_buffer: &mut Buffer) -> io::Result<()> {
         .map_err(io::Error::other)
         .with_context("failed to decode config")?;
 
-    println!("{:?}", test_config);
-
     let buffer_writer = BufferWriter::stdout(ColorChoice::Always);
     let mut buffer = buffer_writer.buffer();
 
-    let f = GenericIndentFormatter::new(&mut buffer, 4);
+    let f = IndentWriter::new(&mut buffer, 4);
     let mut stream =
         format_streams::indent_formatter::IndentFormatterStream::new(
             Theme::idk(),
@@ -124,7 +122,6 @@ fn driver(opts: CliOpts, error_buffer: &mut Buffer) -> io::Result<()> {
         .map_err(io::Error::other)?;
 
     buffer_writer.print(&buffer)?;
-    println!();
 
     Ok(())
 }

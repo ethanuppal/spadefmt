@@ -11,6 +11,7 @@
 // details. You should have received a copy of the GNU General Public License
 // along with spadefmt. If not, see <https://www.gnu.org/licenses/>.
 
+use core::panic;
 use std::fmt;
 
 #[derive(Clone, Copy)]
@@ -23,6 +24,7 @@ pub enum HighlightGroup {
     TypeName,
     Literal,
     Symbol,
+    Attribute,
 }
 
 pub trait FormatStream {
@@ -65,44 +67,61 @@ pub trait FormatStream {
         self.process_code(symbol, HighlightGroup::Literal)
     }
 
+    fn attribute(&mut self, attribute: &str) -> fmt::Result {
+        self.process_code("#", HighlightGroup::Attribute)?;
+        self.symbol("[")?;
+        self.process_code(attribute, HighlightGroup::Attribute)?;
+        self.symbol("]")
+    }
+
     fn space(&mut self) -> fmt::Result {
         self.process_code(" ", HighlightGroup::None)
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum CommitState {
-    Idle,
-    Commit,
-    Pause,
+///  `ConcreteMark { line, column, indent_level }` means there is a mark set at
+/// line `line` and column `column`, both zero-indexed, where the indent level
+/// was `indent_level`.
+struct ConcreteMark {
+    line: usize,
+    column: usize,
+    indent_level: usize,
+    should_commit: bool,
+    width_limit_failure: bool,
 }
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Mark(usize);
 
 pub struct CommitableFormatStream<'stream> {
     inner: &'stream mut dyn FormatStream,
     indent: usize,
     indent_level: usize,
     just_got_newline: bool,
-    state: CommitState,
+    should_commit: bool,
+    max_width: usize,
+    /// Whether the column limit of `self.max_width` has been exceeded *while
+    /// non-comittable*.
+    width_limit_failure: bool,
     /// Invariant: `!lines.is_empty() && levels.len() == lines.len()`.
     lines: Vec<usize>,
-    /// If `mark` is `Some((line, column, indent_level))`, there is a mark set
-    /// at line `line` and column `column`, both zero-indexed, where the
-    /// indent level was `indent_level`.
-    mark: Option<(usize, usize, usize)>,
+    marks: Vec<ConcreteMark>,
 }
 
 impl<'stream> CommitableFormatStream<'stream> {
-    pub fn indenting_by(
-        indent: usize, inner: &'stream mut dyn FormatStream,
+    pub fn new_with_config(
+        inner: &'stream mut dyn FormatStream, indent: usize, max_width: usize,
     ) -> Self {
         Self {
             inner,
             indent,
             just_got_newline: false,
-            state: CommitState::Idle,
+            should_commit: true,
+            max_width,
+            width_limit_failure: false,
             indent_level: 0,
             lines: vec![1],
-            mark: None,
+            marks: Vec::new(),
         }
     }
 
@@ -111,54 +130,70 @@ impl<'stream> CommitableFormatStream<'stream> {
         self.lines[last_line]
     }
 
-    pub fn set_mark(&mut self) {
+    /// Sets a new location mark, saving state like whether the stream is
+    /// comitting or whether theere has been a width error.
+    pub fn push_mark(&mut self) -> Mark {
         let current_line = self.lines.len() - 1;
-        self.mark =
-            Some((current_line, self.lines[current_line], self.indent_level))
+        self.marks.push(ConcreteMark {
+            line: current_line,
+            column: self.lines[current_line],
+            indent_level: self.indent_level,
+            should_commit: self.should_commit,
+            width_limit_failure: self.width_limit_failure,
+        });
+        Mark(self.marks.len() - 1)
     }
 
-    pub fn return_to_mark(&mut self) {
-        let (line, column, indent_level) = self.mark.expect("no mark set");
+    /// Restores the given mark, consuming it and any mark set after it. Panics
+    /// if the mark has not been set.
+    pub fn return_to_mark(&mut self, mark: Mark) {
+        let Mark(mark_index) = mark;
+
+        if mark_index >= self.marks.len() {
+            panic!("no mark set");
+        }
+
+        let ConcreteMark {
+            line,
+            column,
+            indent_level,
+            should_commit,
+            width_limit_failure,
+        } = self.marks[mark_index];
+        self.marks.truncate(mark_index);
+
         self.lines.truncate(line + 1);
         self.lines[line] = column;
         self.indent_level = indent_level;
-        self.mark = None;
+        self.should_commit = should_commit;
+        self.width_limit_failure = width_limit_failure;
     }
 
-    pub fn commit<R, F: FnOnce(&mut Self) -> R>(&mut self, f: F) -> R {
-        let before = self.state;
-        self.state = CommitState::Commit;
-        let result = f(self);
-        self.state = before;
-        result
-    }
-
-    pub fn pause<R, F: FnOnce(&mut Self) -> R>(&mut self, f: F) -> R {
-        if self.state == CommitState::Idle {
-            f(self)
-        } else {
-            self.state = CommitState::Pause;
-            let result = f(self);
-            self.state = CommitState::Idle;
-            result
-        }
-    }
-
+    #[inline]
     pub fn enable_commit(&mut self) {
-        self.state = CommitState::Commit;
+        self.should_commit = true;
+        self.width_limit_failure = false;
     }
 
+    #[inline]
     pub fn disable_commit(&mut self) {
-        self.state = CommitState::Idle;
+        self.should_commit = false;
+    }
+
+    #[inline]
+    pub fn width_limit_failure(&self) -> bool {
+        self.width_limit_failure
     }
 }
 
-impl<'stream> FormatStream for CommitableFormatStream<'stream> {
+impl FormatStream for CommitableFormatStream<'_> {
     fn indent(&mut self) -> fmt::Result {
         self.indent_level += self.indent;
 
-        if self.state == CommitState::Commit {
+        if self.should_commit {
             self.inner.indent()?;
+        } else if self.current_width() > self.max_width {
+            self.width_limit_failure = true;
         }
 
         Ok(())
@@ -167,8 +202,8 @@ impl<'stream> FormatStream for CommitableFormatStream<'stream> {
     fn dedent(&mut self) -> fmt::Result {
         self.indent_level -= self.indent;
 
-        if self.state == CommitState::Commit {
-            self.inner.indent()?;
+        if self.should_commit {
+            self.inner.dedent()?;
         }
 
         Ok(())
@@ -178,8 +213,8 @@ impl<'stream> FormatStream for CommitableFormatStream<'stream> {
         self.just_got_newline = true;
         self.lines.push(0);
 
-        if self.state == CommitState::Commit {
-            self.inner.indent()?;
+        if self.should_commit {
+            self.inner.newline()?;
         }
 
         Ok(())
@@ -188,15 +223,17 @@ impl<'stream> FormatStream for CommitableFormatStream<'stream> {
     fn process_code(
         &mut self, code: &str, highlight_group: HighlightGroup,
     ) -> fmt::Result {
+        let last_line = self.lines.len() - 1;
         if self.just_got_newline {
-            self.lines.push(self.indent_level);
+            self.lines[last_line] += self.indent_level;
             self.just_got_newline = false;
         }
-        let last_line = self.lines.len() - 1;
         self.lines[last_line] += code.len();
 
-        if self.state == CommitState::Commit {
+        if self.should_commit {
             self.inner.process_code(code, highlight_group)?;
+        } else if self.current_width() > self.max_width {
+            self.width_limit_failure = true;
         }
 
         Ok(())

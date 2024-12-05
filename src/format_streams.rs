@@ -83,6 +83,7 @@ pub struct Theme {
     type_name: ColorSpec,
     symbol: ColorSpec,
     literal: ColorSpec,
+    attribute: ColorSpec,
 }
 
 impl Theme {
@@ -113,6 +114,7 @@ impl Theme {
                 .fg(Color::Green)
                 .intense()
                 .build(),
+            attribute: ColorSpecBuilder::default().fg(Color::Yellow).build(),
         }
 
         // pub fn with_background(color: Color) -> Self {
@@ -146,6 +148,7 @@ impl Theme {
             }
             HighlightGroup::Literal => &self.literal,
             HighlightGroup::Symbol => &self.symbol,
+            HighlightGroup::Attribute => &self.attribute,
         }
     }
 }
