@@ -55,6 +55,14 @@ pub type AstParameter =
 
 can_render!(AstParameter: render_parameter);
 
+#[derive(PartialEq, Eq)]
+pub enum PathStyle {
+    NotType,
+    Type,
+    /// Best-effort attempt to infer the path style.
+    Auto,
+}
+
 pub enum EnclosedRenderStyle {
     Line,
     Tall,
@@ -202,7 +210,7 @@ impl<'stream, 'config> Context<'stream, 'config> {
     ) -> fmt::Result {
         let ast::UseStatement { path, alias } = &use_statement.inner;
 
-        self.render_path(path)?;
+        self.render_path(path, PathStyle::Auto)?;
 
         if let Some(alias) = alias {
             self.f.space()?;
@@ -216,8 +224,28 @@ impl<'stream, 'config> Context<'stream, 'config> {
         Ok(())
     }
 
-    pub fn render_path(&mut self, path: &Loc<Path>) -> fmt::Result {
+    pub fn render_path(
+        &mut self, path: &Loc<Path>, mut style: PathStyle,
+    ) -> fmt::Result {
         let segments = &path.0;
+
+        if style == PathStyle::Auto {
+            if segments
+                .last()
+                .expect("empty path")
+                .0
+                .chars()
+                .next()
+                .expect("empty terminal segment")
+                .is_ascii_uppercase()
+            {
+                style = PathStyle::Type;
+            } else {
+                style = PathStyle::NotType;
+            }
+        }
+        let style = style;
+
         let mut i = 0;
 
         if segments[0].0 == "lib" {
@@ -233,7 +261,11 @@ impl<'stream, 'config> Context<'stream, 'config> {
             }
         }
 
-        self.f.terminal_segment(&segments[i].0)?;
+        if style == PathStyle::Type {
+            self.f.type_name(&segments[i].0)?;
+        } else {
+            self.f.terminal_segment(&segments[i].0)?;
+        }
 
         Ok(())
     }
@@ -289,7 +321,9 @@ impl<'stream, 'config> Context<'stream, 'config> {
         &mut self, expression: &Loc<ast::Expression>,
     ) -> fmt::Result {
         match &**expression {
-            ast::Expression::Identifier(path) => self.render_path(path),
+            ast::Expression::Identifier(path) => {
+                self.render_path(path, PathStyle::NotType)
+            }
             ast::Expression::IntLiteral(int_literal) => {
                 self.f.literal(&int_literal.to_string())
             }
@@ -339,7 +373,7 @@ impl<'stream, 'config> Context<'stream, 'config> {
             }
             ast::Expression::BinaryOperator(loc, loc1, loc2) => todo!(),
             ast::Expression::Block(block) => {
-                self.f.symbol("{")?;
+                self.f.symbol(lexer::TokenKind::OpenBrace.as_str())?;
                 if block.statements.len()
                     + block.result.as_ref().map_or(0, |_| 1)
                     > 0
@@ -359,7 +393,7 @@ impl<'stream, 'config> Context<'stream, 'config> {
 
                     self.f.dedent()?;
                 }
-                self.f.symbol("}")
+                self.f.symbol(lexer::TokenKind::CloseBrace.as_str())
             }
             ast::Expression::PipelineReference {
                 stage_kw_and_reference_loc,
@@ -382,7 +416,9 @@ impl<'stream, 'config> Context<'stream, 'config> {
             ast::Pattern::Bool(bool_literal) => {
                 self.f.literal(&bool_literal.to_string())
             }
-            ast::Pattern::Path(path) => self.render_path(path),
+            ast::Pattern::Path(path) => {
+                self.render_path(path, PathStyle::NotType)
+            }
             ast::Pattern::Tuple(vec) => todo!(),
             ast::Pattern::Array(vec) => todo!(),
             ast::Pattern::Type(loc, loc1) => todo!(),
@@ -430,7 +466,7 @@ impl<'stream, 'config> Context<'stream, 'config> {
             }
             ast::TypeSpec::Named(path, type_params) => {
                 // TODO: somehow use f.type_name()
-                self.render_path(path)?;
+                self.render_path(path, PathStyle::Type)?;
                 if let Some(params) = type_params {
                     self.f.symbol("<")?;
                     for (i, param) in params.iter().enumerate() {
@@ -465,7 +501,7 @@ impl<'stream, 'config> Context<'stream, 'config> {
     ) -> fmt::Result {
         match &**type_param {
             ast::TypeParam::TypeName { name, traits } => {
-                self.f.identifier(&name.0)?;
+                self.f.type_name(&name.0)?;
                 if !traits.is_empty() {
                     self.f.symbol(":")?;
                     self.f.space()?;
@@ -487,7 +523,7 @@ impl<'stream, 'config> Context<'stream, 'config> {
     pub fn render_trait_spec(
         &mut self, trait_spec: &Loc<ast::TraitSpec>,
     ) -> fmt::Result {
-        self.render_path(&trait_spec.path)?;
+        self.render_path(&trait_spec.path, PathStyle::Type)?;
         if let Some(type_params) = &trait_spec.type_params {
             self.render_enclosed_auto(
                 Some(lexer::TokenKind::Lt),
