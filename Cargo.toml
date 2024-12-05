@@ -8,7 +8,7 @@ description = "Opinionated code formatter for the Spade language"
 license = "GPL-3.0-or-later"
 keywords = ["spadefmt", "formatter", "autoformat"]
 categories = ["development-tools"]
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 rust-version = "1.83"
 
@@ -18,10 +18,10 @@ spade-parser = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade"
 spade-ast = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
 spade-diagnostics = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
 spade-common = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
-codespan-reporting = { git = "https://gitlab.com/spade-lang/codespan.git", branch = "master" }
+codespan-reporting = { version = "0.12.0", git = "https://gitlab.com/spade-lang/codespan.git", branch = "master" }
 argh = "0.1.12"
 camino = "1.1.9"
-logos = "0.14.3"                                                                               # sad that spade doesn't reexport this
+logos = "0.14.3"                                                                                                   # sad that spade doesn't reexport this
 serde = { version = "1.0.215", features = ["derive"] }
 toml = "0.8.19"
 derivative = "2.2.0"
