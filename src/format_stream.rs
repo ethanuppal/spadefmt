@@ -64,7 +64,7 @@ pub trait FormatStream {
     }
 
     fn symbol(&mut self, symbol: &str) -> fmt::Result {
-        self.process_code(symbol, HighlightGroup::Literal)
+        self.process_code(symbol, HighlightGroup::Symbol)
     }
 
     fn attribute(&mut self, attribute: &str) -> fmt::Result {
