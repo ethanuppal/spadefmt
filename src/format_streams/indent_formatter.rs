@@ -11,13 +11,10 @@
 // details. You should have received a copy of the GNU General Public License
 // along with spadefmt. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    fmt,
-    io::{self, Write},
-};
+use std::{fmt, io::Write};
 
 use codespan_reporting::term::termcolor::{Buffer, WriteColor};
-use inform::io::GenericIndentFormatter;
+use inform::{common::IndentWriterCommon, io::IndentWriter};
 
 use crate::format_stream::{FormatStream, HighlightGroup};
 
@@ -25,13 +22,11 @@ use super::Theme;
 
 pub struct IndentFormatterStream<'buffer> {
     theme: Theme,
-    f: GenericIndentFormatter<'buffer, Buffer>,
+    f: IndentWriter<'buffer, Buffer>,
 }
 
 impl<'buffer> IndentFormatterStream<'buffer> {
-    pub fn new(
-        theme: Theme, f: GenericIndentFormatter<'buffer, Buffer>,
-    ) -> Self {
+    pub fn new(theme: Theme, f: IndentWriter<'buffer, Buffer>) -> Self {
         Self { theme, f }
     }
 }
@@ -54,6 +49,7 @@ impl FormatStream for IndentFormatterStream<'_> {
     fn process_code(
         &mut self, code: &str, highlight_group: HighlightGroup,
     ) -> fmt::Result {
+        self.f.indent_if_needed();
         let color = self.theme.color_for(code, highlight_group);
         self.f.with_raw_buffer(|buffer| {
             buffer.set_color(color).map_err(|_| fmt::Error)?;
