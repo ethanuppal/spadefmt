@@ -12,6 +12,7 @@
 // along with spadefmt. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
+    cell::RefCell,
     collections::HashMap,
     hash::Hash,
     marker::PhantomData,
@@ -80,6 +81,18 @@ impl<'a, T> Iterator for InternedMapIter<'a, T> {
     }
 }
 
+// impl<'a, T> DoubleEndedIterator for InternedMapIter<'a, T> {
+//     fn next_back(&mut self) -> Option<Self::Item> {
+//         if self.next == self.store.len() {
+//             None
+//         } else {
+//             let (value, rest) = self.store.split_last().unwrap();
+//             self.store = rest;
+//             Some((InternedKey::at(self.store.len()), value))
+//         }
+//     }
+// }
+
 impl<'a, T> IntoIterator for &'a InternedMap<T> {
     type Item = (InternedKey<T>, &'a T);
 
@@ -106,3 +119,54 @@ impl<T> IndexMut<InternedKey<T>> for InternedMap<T> {
         &mut self.store[key.index]
     }
 }
+
+pub struct InternedInfoMap<T, V> {
+    store: Box<[V]>,
+    present: Box<[bool]>,
+    _generic: PhantomData<T>,
+}
+
+impl<T, V> InternedInfoMap<InternedKey<T>, V> {
+    pub fn aligned_with(backing_context: &InternedMap<T>) -> Self {
+        let length = backing_context.store.len();
+
+        let mut store = Vec::with_capacity(length);
+        #[allow(clippy::uninit_vec)]
+        unsafe {
+            store.set_len(length);
+        }
+
+        Self {
+            store: store.into_boxed_slice(),
+            present: vec![false; length].into_boxed_slice(),
+            _generic: PhantomData,
+        }
+    }
+
+    pub fn init(&mut self, key: InternedKey<T>, value: V)
+    where
+        V: Clone, {
+        self.store[key.index] = value;
+        self.present[key.index] = true;
+    }
+
+    pub fn contains_key(&self, key: InternedKey<T>) -> bool {
+        self.present[key.index]
+    }
+}
+
+impl<T, V> Index<InternedKey<T>> for InternedInfoMap<InternedKey<T>, V> {
+    type Output = V;
+
+    fn index(&self, key: InternedKey<T>) -> &Self::Output {
+        assert!(self.present[key.index]);
+        &self.store[key.index]
+    }
+}
+
+// impl<T, V> IndexMut<InternedKey<T>> for InternedInfoMap<InternedKey<T>, V> {
+//     fn index_mut(&mut self, key: InternedKey<T>) -> &mut Self::Output {
+//         assert!(self.present[key.index]);
+//         &mut self.store[key.index]
+//     }
+// }

@@ -18,3 +18,4 @@ pub mod cost;
 pub mod document;
 pub mod interned_map;
 pub mod layout;
+pub mod resolve;

@@ -11,15 +11,12 @@
 // details. You should have received a copy of the GNU General Public License
 // along with spadefmt. If not, see <https://www.gnu.org/licenses/>.
 
-use std::marker::PhantomData;
-
 use crate::interned_map::{InternedKey, InternedMap};
 
-/// So that I can refer to `InternedMap` with `rustdoc` links.
-const IMPORT_INTERNED_MAP: PhantomData<InternedMap<Document>> = PhantomData;
-
-/// Pointer to a [`Document`] in an [`InternedMap<Document>`].
+/// Pointer to a [`Document`] in an [`DocumentContext`].
 pub type DocumentRef = InternedKey<Document>;
+
+pub struct DocumentContext(InternedMap<Document>);
 
 /// Defined on pages 261:8 and 261:14.
 #[derive(PartialEq, Eq, Hash, Clone)]
@@ -28,7 +25,7 @@ pub enum Document {
     Newline,
     Concat(Vec<DocumentRef>),
     Nest {
-        add_indent_amount: usize,
+        add_indent_levels: usize,
         child: DocumentRef,
     },
     Flatten(DocumentRef),
@@ -38,8 +35,11 @@ pub enum Document {
     // AlignedConcat(DocumentRef, DocumentRef)
 }
 
-// impl DocumentContext {
-//         fn tree_iter(&self) -> impl Iterator<Item = (DocumentRef, &Document)>
-// {                 self.0.into_iter()
-//             }
-// }
+impl DocumentContext {
+    /// Iterates through the tree in reverse order
+    fn tree_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (DocumentRef, &Document)> {
+        self.0.into_iter()
+    }
+}

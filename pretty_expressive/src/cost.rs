@@ -15,16 +15,16 @@ use std::{cmp, ops::Add};
 
 /// A cost can be added and are totally ordered. More formally, a cost is a
 /// "totally ordered monoid with translational invariance" (p. 261:10).
-pub trait Cost: Sized + Ord + Add {
-    /// The cost for formatting text at the given `line` and `column`, subject
-    /// to the following invariants:
+pub trait Cost: Sized + Ord + Add<Output = Self> + Clone {
+    /// The cost for formatting `length` characters at the given `column`,
+    /// subject to the following invariants:
     ///
-    /// 1. For any line `l` and columns `c`, `c'`, if `c <= c'`,
+    /// 1. For any length `l` and columns `c`, `c'`, if `c <= c'`,
     ///    `Self::for_text(c, l) <= Self::for_text(c', l)`.
-    /// 2. For any column `c` and lines `l`, `l'`, `Self::for_text(c, l + l') =
-    ///    Self::for_text(c + l, l')`.
+    /// 2. For any column `c` and lengths `l`, `l'`, `Self::for_text(c, l + l')
+    ///    = Self::for_text(c + l, l')`.
     /// 3. For any column `c`, `Self::for_text(c, 0) = Self::for_text(0, 0)`.
-    fn for_text(line: usize, column: usize, width_limit: usize) -> Self;
+    fn for_text(column: usize, length: usize, max_width: usize) -> Self;
 
     const NEWLINE_COST: Self;
 }
@@ -32,7 +32,7 @@ pub trait Cost: Sized + Ord + Add {
 /// "The following cost factory targets an optimality objective that minimizes
 /// the sum of squared overflows over the page width limit..., and then the
 /// height" (p. 261:10).
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Example3_5(usize, usize);
 
 impl PartialOrd for Example3_5 {
@@ -60,11 +60,11 @@ impl Add for Example3_5 {
 }
 
 impl Cost for Example3_5 {
-    fn for_text(line: usize, column: usize, width_limit: usize) -> Self {
-        if column + line > width_limit {
+    fn for_text(column: usize, length: usize, max_width: usize) -> Self {
+        if column + length > max_width {
             // I don't know what `a` and `b` mean:
-            let a = cmp::max(width_limit, column) - width_limit;
-            let b = column + line - cmp::max(width_limit, column);
+            let a = cmp::max(max_width, column) - max_width;
+            let b = column + length - cmp::max(max_width, column);
             Self(b * (2 * a + b), 0)
         } else {
             Self(0, 0)
