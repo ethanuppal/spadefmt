@@ -1,5 +1,5 @@
 [package]
-name = "pretty_expressive"
+name = "pretty-expressive"
 authors.workspace = true
 description.workspace = true
 license.workspace = true

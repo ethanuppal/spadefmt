@@ -1,15 +1,16 @@
-// // Copyright (C) 2024 Ethan Uppal.
-// //
-// // This file is part of spadefmt.
-// //
-// // spadefmt is free software: you can redistribute it and/or modify it under
-// the // terms of the GNU General Public License as published by the Free
-// Software // Foundation, either version 3 of the License, or (at your option)
-// any later // version. spadefmt is distributed in the hope that it will be
-// useful, but // WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or // FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
-// Public License for more // details. You should have received a copy of the
-// GNU General Public License // along with spadefmt. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Ethan Uppal.
+//
+// This file is part of pretty-expressive.
+//
+// pretty-expressive is free software: you can redistribute it and/or modify it
+// under the terms of the GNU Lesser General Public License as published by the
+// Free Software Foundation, either version 3 of the License, or (at your
+// option) any later version. pretty-expressive is distributed in the hope that
+// it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+// Lesser General Public License for more details. You should have received a
+// copy of the GNU Lesser General Public License along with pretty-expressive.
+// If not, see <https://www.gnu.org/licenses/>.
 //
 // use crate::{document::Document, interned_map::InternedMap};
 //
