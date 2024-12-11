@@ -62,7 +62,9 @@ fn new_output_buffer(color: ColorChoice) -> Buffer {
 }
 
 fn new_error_handler<'a>(
-    error_buffer: &'a mut Buffer, file: &Utf8Path, contents: String,
+    error_buffer: &'a mut Buffer,
+    file: &Utf8Path,
+    contents: String,
 ) -> spade::ErrorHandler<'a> {
     let mut files = SimpleFiles::new();
     files.add(file.to_string(), contents);

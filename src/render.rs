@@ -70,7 +70,8 @@ pub enum EnclosedRenderStyle {
 
 impl<'stream, 'config> Context<'stream, 'config> {
     pub fn new<F: FormatStream>(
-        f: &'stream mut F, config: &'config Config,
+        f: &'stream mut F,
+        config: &'config Config,
     ) -> Self {
         let f = CommitableFormatStream::new_with_config(
             f,
@@ -194,7 +195,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_module_body(
-        &mut self, body: &Loc<ast::ModuleBody>,
+        &mut self,
+        body: &Loc<ast::ModuleBody>,
     ) -> fmt::Result {
         for (i, item) in body.members.iter().enumerate() {
             if i > 0 {
@@ -206,7 +208,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_use(
-        &mut self, use_statement: &Loc<ast::UseStatement>,
+        &mut self,
+        use_statement: &Loc<ast::UseStatement>,
     ) -> fmt::Result {
         let ast::UseStatement { path, alias } = &use_statement.inner;
 
@@ -225,7 +228,9 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_path(
-        &mut self, path: &Loc<Path>, mut style: PathStyle,
+        &mut self,
+        path: &Loc<Path>,
+        mut style: PathStyle,
     ) -> fmt::Result {
         let segments = &path.0;
 
@@ -273,7 +278,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     /// Requires: a newline has just been formatted.
     /// Ensures: a newline has been written.
     pub fn render_statement(
-        &mut self, statement: &Loc<ast::Statement>,
+        &mut self,
+        statement: &Loc<ast::Statement>,
     ) -> fmt::Result {
         match &**statement {
             ast::Statement::Label(loc) => todo!(),
@@ -318,7 +324,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_expression(
-        &mut self, expression: &Loc<ast::Expression>,
+        &mut self,
+        expression: &Loc<ast::Expression>,
     ) -> fmt::Result {
         match &**expression {
             ast::Expression::Identifier(path) => {
@@ -407,7 +414,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_pattern(
-        &mut self, pattern: &Loc<ast::Pattern>,
+        &mut self,
+        pattern: &Loc<ast::Pattern>,
     ) -> fmt::Result {
         match &**pattern {
             ast::Pattern::Integer(int_literal) => {
@@ -426,7 +434,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_type_expression(
-        &mut self, type_expression: &Loc<ast::TypeExpression>,
+        &mut self,
+        type_expression: &Loc<ast::TypeExpression>,
     ) -> fmt::Result {
         match &**type_expression {
             ast::TypeExpression::TypeSpec(type_spec) => {
@@ -442,7 +451,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_type_spec(
-        &mut self, type_spec: &Loc<ast::TypeSpec>,
+        &mut self,
+        type_spec: &Loc<ast::TypeSpec>,
     ) -> fmt::Result {
         match &**type_spec {
             ast::TypeSpec::Tuple(elements) => {
@@ -497,7 +507,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_type_param(
-        &mut self, type_param: &Loc<ast::TypeParam>,
+        &mut self,
+        type_param: &Loc<ast::TypeParam>,
     ) -> fmt::Result {
         match &**type_param {
             ast::TypeParam::TypeName { name, traits } => {
@@ -521,7 +532,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_trait_spec(
-        &mut self, trait_spec: &Loc<ast::TraitSpec>,
+        &mut self,
+        trait_spec: &Loc<ast::TraitSpec>,
     ) -> fmt::Result {
         self.render_path(&trait_spec.path, PathStyle::Type)?;
         if let Some(type_params) = &trait_spec.type_params {
@@ -539,7 +551,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_attribute(
-        &mut self, attribute: &Loc<ast::Attribute>,
+        &mut self,
+        attribute: &Loc<ast::Attribute>,
     ) -> fmt::Result {
         match &**attribute {
             ast::Attribute::Optimize { passes } => todo!(),
@@ -556,7 +569,9 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_attribute_list(
-        &mut self, attribute_list: &ast::AttributeList, always_newline: bool,
+        &mut self,
+        attribute_list: &ast::AttributeList,
+        always_newline: bool,
     ) -> fmt::Result {
         match attribute_list.0.len() {
             0 => Ok(()),
@@ -576,7 +591,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_parameter(
-        &mut self, parameter: &AstParameter,
+        &mut self,
+        parameter: &AstParameter,
     ) -> fmt::Result {
         self.render_attribute_list(&parameter.0, false)?;
         self.f.identifier(&parameter.1 .0)?;
@@ -586,7 +602,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     pub fn render_parameter_list(
-        &mut self, parameter_list: &Loc<ast::ParameterList>,
+        &mut self,
+        parameter_list: &Loc<ast::ParameterList>,
         enclosed_render_style: EnclosedRenderStyle,
     ) -> fmt::Result {
         self.render_enclosed(
@@ -603,10 +620,13 @@ impl<'stream, 'config> Context<'stream, 'config> {
     /// Use [`Self::render_enclosed_auto`] unless you need a specific
     /// [`EnclosedRenderStyle`].
     pub fn render_enclosed<R: RenderInContext>(
-        &mut self, open_symbol: Option<lexer::TokenKind>,
-        close_symbol: Option<lexer::TokenKind>, enclosed: &[R],
+        &mut self,
+        open_symbol: Option<lexer::TokenKind>,
+        close_symbol: Option<lexer::TokenKind>,
+        enclosed: &[R],
         deliminter_symbol: Option<lexer::TokenKind>,
-        enclosed_render_style: EnclosedRenderStyle, even_delimeter: bool,
+        enclosed_render_style: EnclosedRenderStyle,
+        even_delimeter: bool,
         trailing_delimiter: bool,
     ) -> fmt::Result {
         if let Some(open_symbol) = open_symbol {
@@ -658,7 +678,8 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     fn try_commit<F: Fn(&mut Self) -> fmt::Result>(
-        &mut self, try_commit: F,
+        &mut self,
+        try_commit: F,
     ) -> Result<bool, fmt::Error> {
         let mark = self.f.push_mark();
         self.f.disable_commit();
@@ -674,9 +695,12 @@ impl<'stream, 'config> Context<'stream, 'config> {
     }
 
     fn render_enclosed_auto<R: RenderInContext>(
-        &mut self, open_symbol: Option<lexer::TokenKind>,
-        close_symbol: Option<lexer::TokenKind>, enclosed: &[R],
-        deliminter_symbol: Option<lexer::TokenKind>, even_delimeter: bool,
+        &mut self,
+        open_symbol: Option<lexer::TokenKind>,
+        close_symbol: Option<lexer::TokenKind>,
+        enclosed: &[R],
+        deliminter_symbol: Option<lexer::TokenKind>,
+        even_delimeter: bool,
         trailing_delimiter: bool,
     ) -> fmt::Result {
         if self.try_commit(|c| {
