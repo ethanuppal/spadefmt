@@ -36,7 +36,9 @@ pub trait FormatStream {
 
     /// `code` is guaranteed to contain no newlines.
     fn process_code(
-        &mut self, code: &str, highlight_group: HighlightGroup,
+        &mut self,
+        code: &str,
+        highlight_group: HighlightGroup,
     ) -> fmt::Result;
 
     fn identifier(&mut self, name: &str) -> fmt::Result {
@@ -110,7 +112,9 @@ pub struct CommitableFormatStream<'stream> {
 
 impl<'stream> CommitableFormatStream<'stream> {
     pub fn new_with_config(
-        inner: &'stream mut dyn FormatStream, indent: usize, max_width: usize,
+        inner: &'stream mut dyn FormatStream,
+        indent: usize,
+        max_width: usize,
     ) -> Self {
         Self {
             inner,
@@ -221,7 +225,9 @@ impl FormatStream for CommitableFormatStream<'_> {
     }
 
     fn process_code(
-        &mut self, code: &str, highlight_group: HighlightGroup,
+        &mut self,
+        code: &str,
+        highlight_group: HighlightGroup,
     ) -> fmt::Result {
         let last_line = self.lines.len() - 1;
         if self.just_got_newline {

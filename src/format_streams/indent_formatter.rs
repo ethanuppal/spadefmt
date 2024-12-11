@@ -47,7 +47,9 @@ impl FormatStream for IndentFormatterStream<'_> {
     }
 
     fn process_code(
-        &mut self, code: &str, highlight_group: HighlightGroup,
+        &mut self,
+        code: &str,
+        highlight_group: HighlightGroup,
     ) -> fmt::Result {
         self.f.indent_if_needed();
         let color = self.theme.color_for(code, highlight_group);

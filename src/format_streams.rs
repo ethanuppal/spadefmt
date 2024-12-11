@@ -123,7 +123,9 @@ impl Theme {
     }
 
     pub fn color_for(
-        &self, code: &str, highlight_group: HighlightGroup,
+        &self,
+        code: &str,
+        highlight_group: HighlightGroup,
     ) -> &ColorSpec {
         match highlight_group {
             HighlightGroup::None => &self.reset,

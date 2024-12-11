@@ -1,5 +1,5 @@
 [workspace]
-members = []
+members = ["pretty_expressive"]
 resolver = "2"
 
 [workspace.package]
@@ -38,6 +38,9 @@ categories.workspace = true
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 
 [dependencies]
 spade.workspace = true
