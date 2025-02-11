@@ -119,7 +119,7 @@ pub struct BoundedConfigUsize<
     const UNITS: String16,
 > {
     #[derivative(Default(value = "DEFAULT"))]
-    inner: usize,
+    pub inner: usize,
 }
 
 impl<
