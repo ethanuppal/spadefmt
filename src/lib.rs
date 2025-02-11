@@ -15,7 +15,5 @@
 
 pub mod cli;
 pub mod config;
-pub mod format_stream;
-pub mod format_streams;
 pub mod render;
 pub mod with_context;
