@@ -17,4 +17,3 @@ pub mod cli;
 pub mod config;
 pub mod document;
 pub mod render;
-pub mod with_context;
