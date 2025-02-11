@@ -17,5 +17,4 @@ pub mod cli;
 pub mod config;
 pub mod document;
 pub mod document_builder;
-pub mod printer;
 pub mod resolve_try_catch;

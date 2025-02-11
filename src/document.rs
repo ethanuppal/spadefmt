@@ -58,60 +58,92 @@ impl InternedDocumentStore {
     }
 }
 
-pub struct DocumentDebugPrinter<'a> {
-    store: &'a InternedDocumentStore,
+pub fn print_resolved<W: fmt::Write>(
+    store: &InternedDocumentStore, f: &mut inform::fmt::IndentWriter<W>,
+    idx: DocumentIdx, flattened: bool,
+) -> fmt::Result {
+    match store.get(idx) {
+        Document::Newline => {
+            if flattened {
+                write!(f, " ")
+            } else {
+                writeln!(f)
+            }
+        }
+        Document::Text(text) => write!(f, "{}", text),
+        Document::Nest(body_idx, by) => {
+            // TODO: extend indent formatter
+            if *by > 0 {
+                f.increase_indent();
+            } else {
+                f.decrease_indent();
+            }
+            print_resolved(store, f, *body_idx, flattened)?;
+            if *by > 0 {
+                f.decrease_indent();
+            } else {
+                f.increase_indent();
+            }
+            Ok(())
+        }
+        Document::Flatten(body_idx) => {
+            print_resolved(store, f, *body_idx, true)
+        }
+        Document::List(children) => children
+            .iter()
+            .copied()
+            .try_for_each(|child| print_resolved(store, f, child, flattened)),
+        Document::TryCatch(_, _) => {
+            panic!("TryCatch found in resolved document")
+        }
+    }
 }
 
-impl<'a> DocumentDebugPrinter<'a> {
-    pub fn new(store: &'a InternedDocumentStore) -> Self {
-        Self { store }
-    }
-
-    pub fn print<W: fmt::Write>(
-        &self, f: &mut inform::fmt::IndentWriter<W>, idx: DocumentIdx,
-    ) -> fmt::Result {
-        match self.store.get(idx) {
-            Document::Newline => write!(f, "Newline"),
-            Document::Text(text) => write!(f, "Text(\"{}\")", text),
-            Document::Nest(body_idx, by) => {
-                writeln!(f, "Nest(")?;
-                f.increase_indent();
-                self.print(f, *body_idx)?;
-                writeln!(f, ",\n{}", by)?;
-                f.decrease_indent();
-                write!(f, ")")
+pub fn debug_print<W: fmt::Write>(
+    store: &InternedDocumentStore, f: &mut inform::fmt::IndentWriter<W>,
+    idx: DocumentIdx,
+) -> fmt::Result {
+    match store.get(idx) {
+        Document::Newline => write!(f, "Newline"),
+        Document::Text(text) => write!(f, "Text(\"{}\")", text),
+        Document::Nest(body_idx, by) => {
+            writeln!(f, "Nest(")?;
+            f.increase_indent();
+            debug_print(store, f, *body_idx)?;
+            writeln!(f, ",\n{}", by)?;
+            f.decrease_indent();
+            write!(f, ")")
+        }
+        Document::Flatten(body_idx) => {
+            writeln!(f, "Flatten(")?;
+            f.increase_indent();
+            debug_print(store, f, *body_idx)?;
+            writeln!(f)?;
+            f.decrease_indent();
+            write!(f, ")")
+        }
+        Document::List(children) => {
+            if children.is_empty() {
+                return Ok(());
             }
-            Document::Flatten(body_idx) => {
-                writeln!(f, "Flatten(")?;
-                f.increase_indent();
-                self.print(f, *body_idx)?;
-                writeln!(f)?;
-                f.decrease_indent();
-                write!(f, ")")
-            }
-            Document::List(children) => {
-                if children.is_empty() {
-                    return Ok(());
-                }
-                writeln!(f, "List(")?;
-                f.increase_indent();
-                for child in children {
-                    self.print(f, *child)?;
-                    writeln!(f, ",")?;
-                }
-                f.decrease_indent();
-                write!(f, ")")
-            }
-            Document::TryCatch(try_body, catch_body) => {
-                writeln!(f, "TryCatch(")?;
-                f.increase_indent();
-                self.print(f, *try_body)?;
+            writeln!(f, "List(")?;
+            f.increase_indent();
+            for child in children {
+                debug_print(store, f, *child)?;
                 writeln!(f, ",")?;
-                self.print(f, *catch_body)?;
-                writeln!(f, ",")?;
-                f.decrease_indent();
-                write!(f, ")")
             }
+            f.decrease_indent();
+            write!(f, ")")
+        }
+        Document::TryCatch(try_body, catch_body) => {
+            writeln!(f, "TryCatch(")?;
+            f.increase_indent();
+            debug_print(store, f, *try_body)?;
+            writeln!(f, ",")?;
+            debug_print(store, f, *catch_body)?;
+            writeln!(f, ",")?;
+            f.decrease_indent();
+            write!(f, ")")
         }
     }
 }

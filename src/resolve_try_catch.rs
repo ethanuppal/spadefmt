@@ -13,76 +13,109 @@
 
 use crate::document::{Document, DocumentIdx, InternedDocumentStore};
 
-#[derive(Clone, Copy)]
-struct PrintingContext {
+#[derive(Default, Clone)]
+pub struct PrintingContext {
+    max_width: usize,
     column: usize,
     current_indent: usize,
     flatten: bool,
+    tainted: bool,
 }
 
-fn fake_evaluate(
-    store: &InternedDocumentStore, max_width: usize,
-    context: &mut PrintingContext, idx: DocumentIdx,
-) -> Result<(), ()> {
-    match store.get(idx) {
-        Document::Newline => {
-            if context.flatten {
-                context.column += 1;
-            } else {
-                context.column = context.current_indent;
-            }
-        }
-        Document::Text(text) => {
-            context.column += text.len();
-            if context.column > max_width {
-                return Err(());
-            }
-        }
-        Document::Nest(body_idx, by) => {
-            let mut nested_context = *context;
-            nested_context.current_indent =
-                (nested_context.current_indent as isize + *by) as usize;
-            fake_evaluate(store, max_width, &mut nested_context, *body_idx)?;
-            nested_context.current_indent = context.current_indent;
-            *context = nested_context;
-        }
-        Document::Flatten(document_idx) => {}
-        Document::List(vec) => todo!(),
-        Document::TryCatch(try_body_idx, catch_body_idx) => {
-            let mut try_context = *context;
-            if let Err(()) =
-                fake_evaluate(store, max_width, &mut try_context, *try_body_idx)
-            {
-                let mut catch_context = *context;
-                fake_evaluate(
-                    store,
-                    max_width,
-                    &mut catch_context,
-                    *catch_body_idx,
-                );
-                *context = catch_context;
-            } else {
-                *context = try_context;
-            }
+impl PrintingContext {
+    pub fn new(max_width: usize) -> Self {
+        Self {
+            max_width,
+            ..Default::default()
         }
     }
-    Ok(())
+
+    fn newline(&mut self) {
+        if self.flatten {
+            self.column += 1;
+        } else {
+            self.column = self.current_indent;
+        }
+        if self.column > self.max_width {
+            self.tainted = true;
+        }
+    }
+
+    fn indent(&mut self, by: isize) {
+        self.current_indent = (self.current_indent as isize + by) as usize;
+    }
+
+    fn push(&mut self, length: usize) {
+        self.column += length;
+        if self.column > self.max_width {
+            self.tainted = true;
+        }
+    }
+
+    fn set_flattened(&mut self) {
+        self.flatten = true;
+    }
 }
 
 // TODO: maybe merge top function into this
 pub fn resolve_try_catch(
     store: &mut InternedDocumentStore, idx: DocumentIdx,
+    context: &mut PrintingContext,
 ) -> DocumentIdx {
     match store.get(idx).clone() {
-        Document::Newline => idx,
-        Document::Text(_) => idx,
+        Document::Newline => {
+            context.newline();
+            idx
+        }
+        Document::Text(text) => {
+            context.push(text.len());
+            idx
+        }
         Document::Nest(body_idx, by) => {
-            store.add(Document::Nest(resolve_try_catch(store, body_idx), by))
+            let mut nested_context = context.clone();
+            nested_context.indent(by);
+            let new_body_idx =
+                resolve_try_catch(store, body_idx, &mut nested_context);
+            *context = nested_context;
+            store.add(Document::Nest(new_body_idx, by))
         }
         Document::Flatten(body_idx) => {
-            store.add(Document::Flatten(resolve_try_catch(store, body_idx)))
+            let mut flattened_context = context.clone();
+            flattened_context.set_flattened();
+            let new_body_idx =
+                resolve_try_catch(store, body_idx, &mut flattened_context);
+            *context = flattened_context;
+            store.add(Document::Flatten(new_body_idx))
         }
-        Document::List(vec) => todo!(),
-        Document::TryCatch(try_body_idx, catch_body_idx) => {}
+        Document::List(children) => {
+            let mut list_context = context.clone();
+            let new_children = children
+                .into_iter()
+                .map(|child| resolve_try_catch(store, child, &mut list_context))
+                .collect();
+            *context = list_context;
+            store.add(Document::List(new_children))
+        }
+        Document::TryCatch(try_body_idx, catch_body_idx) => {
+            let was_tainted = context.tainted;
+            let mut try_context = context.clone();
+            try_context.tainted = false;
+            let new_try_body_idx =
+                resolve_try_catch(store, try_body_idx, &mut try_context);
+            if try_context.tainted {
+                let mut catch_context = context.clone();
+                let new_catch_body_idx = resolve_try_catch(
+                    store,
+                    catch_body_idx,
+                    &mut catch_context,
+                );
+                *context = catch_context;
+                new_catch_body_idx
+            } else {
+                *context = try_context;
+                context.tainted = was_tainted;
+                new_try_body_idx
+            }
+        }
     }
 }
