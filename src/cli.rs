@@ -23,6 +23,10 @@ pub struct Opts {
     #[argh(switch)]
     pub no_color: bool,
 
+    /// print debug representation
+    #[argh(switch)]
+    pub debug: bool,
+
     /// show version information
     #[argh(switch, short = 'v')]
     pub version: bool,

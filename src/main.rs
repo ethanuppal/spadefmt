@@ -26,8 +26,11 @@ use spade_codespan_reporting::{files::SimpleFiles, term::termcolor::Buffer};
 use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
 use spade_parser::logos::Logos;
 use spadefmt::{
-    cli::Opts, config::Config, document::DocumentDebugPrinter,
+    cli::Opts,
+    config::Config,
+    document,
     document_builder::DocumentBuilder,
+    resolve_try_catch::{resolve_try_catch, PrintingContext},
 };
 
 #[snafu::report]
@@ -93,15 +96,29 @@ fn main() -> Result<(), Whatever> {
         .whatever_context("Failed to decode config")?;
 
     let indent = test_config.indent.inner;
-    let (document_store, root_idx) =
+    let (mut document_store, root_idx) =
         DocumentBuilder::new(test_config.indent.inner as isize)
             .build_root(&root);
 
+    if opts.debug {
+        let mut buffer = String::new();
+        let mut f = inform::fmt::IndentWriter::new(&mut buffer, indent);
+        document::debug_print(&document_store, &mut f, root_idx)
+            .whatever_context("Failed to print document")?;
+        println!("{}", buffer);
+        return Ok(());
+    }
+
+    let new_root_idx = resolve_try_catch(
+        &mut document_store,
+        root_idx,
+        &mut PrintingContext::new(test_config.max_width.inner),
+    );
+
     let mut buffer = String::new();
     let mut f = inform::fmt::IndentWriter::new(&mut buffer, indent);
-    DocumentDebugPrinter::new(&document_store)
-        .print(&mut f, root_idx)
-        .whatever_context("Failed to format")?;
+    document::print_resolved(&document_store, &mut f, new_root_idx, false)
+        .whatever_context("Failed to print document")?;
     println!("{}", buffer);
 
     Ok(())
