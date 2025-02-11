@@ -5,28 +5,29 @@ resolver = "2"
 [workspace.package]
 authors = ["Ethan Uppal"]
 description = "Opinionated code formatter for the Spade language"
-license = "GPL-3.0-or-later"
+license = "GPL-3.0"
 keywords = ["spadefmt", "formatter", "autoformat"]
 categories = ["development-tools"]
 version = "0.0.0"
 edition = "2021"
+readme = "README.md"
 rust-version = "1.83"
 
 [workspace.dependencies]
-spade = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
-spade-parser = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
-spade-ast = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
-spade-diagnostics = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
-spade-common = { version = "0.11.0", git = "https://gitlab.com/spade-lang/spade" }
-codespan-reporting = { version = "0.12.0", git = "https://gitlab.com/spade-lang/codespan.git", branch = "master" }
-argh = "0.1.12"
+argh = "0.1.13"
 camino = "1.1.9"
-logos = "0.14.3"                                                                                                   # sad that spade doesn't reexport this
-serde = { version = "1.0.215", features = ["derive"] }
-toml = "0.8.19"
+snafu = "0.8.5"
+
+spade-lang = "0.12.2"
+spade-diagnostics = "0.12.2"
+spade-parser = "0.12.2"
+spade-codespan-reporting = "0.12.0"
+
+serde = { version = "1.0.217", features = ["derive"] }
+toml = "0.8.20"
 derivative = "2.2.0"
-inform = "0.3.3"
-paste = "1.0.15"
+inform = "0.3.4"
+
 
 [package]
 name = "spadefmt"
@@ -40,17 +41,16 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-spade.workspace = true
-spade-parser.workspace = true
-spade-ast.workspace = true
-spade-diagnostics.workspace = true
-spade-common.workspace = true
-codespan-reporting.workspace = true
 argh.workspace = true
 camino.workspace = true
-logos.workspace = true
+snafu.workspace = true
+
+spade-lang.workspace = true
+spade-diagnostics.workspace = true
+spade-parser.workspace = true
+spade-codespan-reporting.workspace = true
+
 serde.workspace = true
 toml.workspace = true
 derivative.workspace = true
 inform.workspace = true
-paste.workspace = true

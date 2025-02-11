@@ -15,119 +15,21 @@
 
 use std::{
     env, fs,
-    io::{self, IsTerminal, Write},
+    io::{self, IsTerminal},
     rc::Rc,
     sync::RwLock,
 };
 
-use camino::Utf8Path;
-use codespan_reporting::{
-    files::SimpleFiles,
-    term::termcolor::{Buffer, BufferWriter, ColorChoice},
-};
-use inform::io::IndentWriter;
-use logos::Logos;
-use spadefmt::{
-    cli::CliOpts,
-    config::Config,
-    format_streams::{self, Theme},
-    render::Context,
-    with_context::WithContext,
-};
+use snafu::{whatever, ResultExt, Whatever};
+pub use spade;
+use spade_codespan_reporting::{files::SimpleFiles, term::termcolor::Buffer};
+use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
+use spade_parser::logos::Logos;
+use spadefmt::{cli::Opts, config::Config};
 
-fn read_file(path: &Utf8Path) -> io::Result<String> {
-    let raw_contents =
-        fs::read(path).with_context(format!("failed to read {}", path))?;
-    String::from_utf8(raw_contents)
-        .map_err(io::Error::other)
-        .with_context("Failed to decode file contents as UTF-8")
-}
-
-fn new_output_buffer(color: ColorChoice) -> Buffer {
-    if !env::var("NO_COLOR").unwrap_or_default().is_empty() {
-        Buffer::no_color()
-    } else {
-        match color {
-            ColorChoice::Always | ColorChoice::AlwaysAnsi => Buffer::ansi(),
-            ColorChoice::Auto => {
-                if io::stdout().is_terminal() {
-                    Buffer::ansi()
-                } else {
-                    Buffer::no_color()
-                }
-            }
-            ColorChoice::Never => Buffer::no_color(),
-        }
-    }
-}
-
-fn new_error_handler<'a>(
-    error_buffer: &'a mut Buffer, file: &Utf8Path, contents: String,
-) -> spade::ErrorHandler<'a> {
-    let mut files = SimpleFiles::new();
-    files.add(file.to_string(), contents);
-
-    let diag_handler = spade_diagnostics::DiagHandler::new(Box::new(
-        spade_diagnostics::emitter::CodespanEmitter,
-    ));
-
-    let code = Rc::new(RwLock::new(spade_diagnostics::CodeBundle { files }));
-
-    spade::ErrorHandler {
-        failed: false,
-        error_buffer,
-        diag_handler,
-        code,
-    }
-}
-
-fn driver(opts: CliOpts, error_buffer: &mut Buffer) -> io::Result<()> {
-    const FILE_ID: usize = 0;
-
-    let contents = read_file(&opts.file)?;
-
-    let mut errors =
-        new_error_handler(error_buffer, &opts.file, contents.clone());
-
-    let mut parser = spade_parser::Parser::new(
-        spade_parser::lexer::TokenKind::lexer(&contents),
-        FILE_ID,
-    );
-
-    let top = parser.top_level_module_body().map_err(|error| {
-        errors.report(&error);
-        for error in &parser.errors {
-            errors.report(error);
-        }
-        io::Error::other(error)
-    })?;
-
-    let test_contents = read_file("test.toml".into())?;
-    let test_config = toml::de::from_str::<Config>(&test_contents)
-        .map_err(io::Error::other)
-        .with_context("failed to decode config")?;
-
-    let buffer_writer = BufferWriter::stdout(ColorChoice::Always);
-    let mut buffer = buffer_writer.buffer();
-
-    let f = IndentWriter::new(&mut buffer, 4);
-    let mut stream =
-        format_streams::indent_formatter::IndentFormatterStream::new(
-            Theme::idk(),
-            f,
-        );
-
-    Context::new(&mut stream, &test_config)
-        .render(&top)
-        .map_err(io::Error::other)?;
-
-    buffer_writer.print(&buffer)?;
-
-    Ok(())
-}
-
-fn main() -> io::Result<()> {
-    let opts = CliOpts::from_env();
+#[snafu::report]
+fn main() -> Result<(), Whatever> {
+    let opts = Opts::from_env();
 
     if opts.version {
         println!(
@@ -141,14 +43,51 @@ fn main() -> io::Result<()> {
         return Ok(());
     }
 
-    let mut error_buffer = new_output_buffer(opts.color.0);
+    const FILE_ID: usize = 0;
 
-    driver(opts, &mut error_buffer)
-        .inspect_err(|_| {
-            let _ = io::stderr().write_all(error_buffer.as_slice());
-        })
-        .or_else(|error| {
-            println!("{}", error);
-            Ok(())
-        })
+    let code = fs::read_to_string(&opts.file)
+        .whatever_context(format!("Failed to read file at {}", opts.file))?;
+
+    let mut files = SimpleFiles::new();
+    files.add(opts.file.to_string(), code.clone());
+
+    let diagnostic_handler = DiagHandler::new(Box::new(CodespanEmitter));
+
+    let code_bundle = Rc::new(RwLock::new(CodeBundle { files }));
+
+    let mut buffer = if opts.no_color || !io::stderr().is_terminal() {
+        Buffer::no_color()
+    } else {
+        Buffer::ansi()
+    };
+
+    let mut error_handler = spade::ErrorHandler {
+        failed: false,
+        error_buffer: &mut buffer,
+        diag_handler: diagnostic_handler,
+        code: code_bundle,
+    };
+
+    let mut parser = spade_parser::Parser::new(
+        spade_parser::lexer::TokenKind::lexer(&code),
+        FILE_ID,
+    );
+
+    let top = match parser.top_level_module_body() {
+        Ok(top) => top,
+        Err(error) => {
+            error_handler.report(&error);
+            for error in &parser.errors {
+                error_handler.report(error);
+            }
+            whatever!("Exiting due to errors")
+        }
+    };
+
+    let test_contents = fs::read_to_string("test.toml")
+        .whatever_context("test file test.toml should be there")?;
+    let test_config = toml::from_str::<Config>(&test_contents)
+        .whatever_context("Failed to decode config")?;
+
+    Ok(())
 }
