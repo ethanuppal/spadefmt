@@ -10,12 +10,3 @@
 // FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
 // details. You should have received a copy of the GNU General Public License
 // along with spadefmt. If not, see <https://www.gnu.org/licenses/>.
-
-#![forbid(unsafe_code)]
-
-pub mod cli;
-pub mod config;
-pub mod document;
-pub mod document_builder;
-pub mod printer;
-pub mod resolve_try_catch;

@@ -26,7 +26,7 @@ use crate::{
 };
 
 pub struct DocumentBuilder {
-    config: Config,
+    indent: isize,
     inner: RefCell<InternedDocumentStore>,
 }
 
@@ -66,9 +66,9 @@ pub type AstParameter =
 can_build!(AstParameter: build_parameter);
 
 impl DocumentBuilder {
-    pub fn new(config: Config) -> Self {
+    pub fn new(indent: isize) -> Self {
         Self {
-            config,
+            indent,
             inner: Default::default(),
         }
     }
@@ -147,10 +147,7 @@ impl DocumentBuilder {
         self.list([
             self.text(format!("mod {} {{", item.name)),
             self.newline(),
-            self.nest(
-                self.build_module_body(&item.body),
-                self.config.indent.inner as isize,
-            ),
+            self.nest(self.build_module_body(&item.body), self.indent),
             self.newline(),
             self.text("}}"),
         ])
@@ -300,10 +297,7 @@ impl DocumentBuilder {
                         nest.push(self.newline());
                     }
 
-                    list.push(self.nest(
-                        self.list(nest),
-                        self.config.indent.inner as isize,
-                    ));
+                    list.push(self.nest(self.list(nest), self.indent));
                 }
                 list.push(self.token(lexer::TokenKind::CloseBrace));
 
@@ -552,13 +546,21 @@ impl DocumentBuilder {
                 list.push(self.newline());
             }
         }
-        let doc_contents =
-            self.nest(self.list(list), self.config.indent.inner as isize);
+        let doc_contents = self.list(list);
+        // try to flatten, otherwise nest
+        let try_catch = self.try_catch(
+            self.flatten(doc_contents),
+            self.list([
+                self.newline(),
+                self.nest(doc_contents, self.indent),
+                self.newline(),
+            ]),
+        );
         let mut main_list = vec![];
         if let Some(open) = open {
             main_list.push(self.token(open));
         }
-        main_list.push(doc_contents);
+        main_list.push(try_catch);
         if let Some(close) = close {
             main_list.push(self.token(close));
         }
