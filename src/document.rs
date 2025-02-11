@@ -11,7 +11,12 @@
 // copy of the GNU General Public License along with spadefmt. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self, Write},
+};
+
+use inform::common::IndentWriterCommon;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct DocumentIdx(usize);
@@ -46,5 +51,67 @@ impl InternedDocumentStore {
 
     pub fn get(&self, idx: DocumentIdx) -> &Document {
         &self.documents[idx.0]
+    }
+
+    pub fn get_mut(&mut self, idx: DocumentIdx) -> &mut Document {
+        &mut self.documents[idx.0]
+    }
+}
+
+pub struct DocumentDebugPrinter<'a> {
+    store: &'a InternedDocumentStore,
+}
+
+impl<'a> DocumentDebugPrinter<'a> {
+    pub fn new(store: &'a InternedDocumentStore) -> Self {
+        Self { store }
+    }
+
+    pub fn print<W: fmt::Write>(
+        &self, f: &mut inform::fmt::IndentWriter<W>, idx: DocumentIdx,
+    ) -> fmt::Result {
+        match self.store.get(idx) {
+            Document::Newline => write!(f, "Newline"),
+            Document::Text(text) => write!(f, "Text(\"{}\")", text),
+            Document::Nest(body_idx, by) => {
+                writeln!(f, "Nest(")?;
+                f.increase_indent();
+                self.print(f, *body_idx)?;
+                writeln!(f, ",\n{}", by)?;
+                f.decrease_indent();
+                write!(f, ")")
+            }
+            Document::Flatten(body_idx) => {
+                writeln!(f, "Flatten(")?;
+                f.increase_indent();
+                self.print(f, *body_idx)?;
+                writeln!(f)?;
+                f.decrease_indent();
+                write!(f, ")")
+            }
+            Document::List(children) => {
+                if children.is_empty() {
+                    return Ok(());
+                }
+                writeln!(f, "List(")?;
+                f.increase_indent();
+                for child in children {
+                    self.print(f, *child)?;
+                    writeln!(f, ",")?;
+                }
+                f.decrease_indent();
+                write!(f, ")")
+            }
+            Document::TryCatch(try_body, catch_body) => {
+                writeln!(f, "TryCatch(")?;
+                f.increase_indent();
+                self.print(f, *try_body)?;
+                writeln!(f, ",")?;
+                self.print(f, *catch_body)?;
+                writeln!(f, ",")?;
+                f.decrease_indent();
+                write!(f, ")")
+            }
+        }
     }
 }

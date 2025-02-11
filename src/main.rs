@@ -25,7 +25,10 @@ pub use spade;
 use spade_codespan_reporting::{files::SimpleFiles, term::termcolor::Buffer};
 use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
 use spade_parser::logos::Logos;
-use spadefmt::{cli::Opts, config::Config};
+use spadefmt::{
+    cli::Opts, config::Config, document::DocumentDebugPrinter,
+    document_builder::DocumentBuilder,
+};
 
 #[snafu::report]
 fn main() -> Result<(), Whatever> {
@@ -73,8 +76,8 @@ fn main() -> Result<(), Whatever> {
         FILE_ID,
     );
 
-    let top = match parser.top_level_module_body() {
-        Ok(top) => top,
+    let root = match parser.top_level_module_body() {
+        Ok(root) => root,
         Err(error) => {
             error_handler.report(&error);
             for error in &parser.errors {
@@ -88,6 +91,18 @@ fn main() -> Result<(), Whatever> {
         .whatever_context("test file test.toml should be there")?;
     let test_config = toml::from_str::<Config>(&test_contents)
         .whatever_context("Failed to decode config")?;
+
+    let indent = test_config.indent.inner;
+    let (document_store, root_idx) =
+        DocumentBuilder::new(test_config.indent.inner as isize)
+            .build_root(&root);
+
+    let mut buffer = String::new();
+    let mut f = inform::fmt::IndentWriter::new(&mut buffer, indent);
+    DocumentDebugPrinter::new(&document_store)
+        .print(&mut f, root_idx)
+        .whatever_context("Failed to format")?;
+    println!("{}", buffer);
 
     Ok(())
 }
