@@ -231,7 +231,7 @@ impl<C: Cost> ChoicelessContext<C> {
         document: DocumentRef,
     ) -> Measure<C> {
         if self.measures.contains_key(document) {
-            return self.measures[document].clone();
+            self.measures[document].clone()
         } else {
             let measure = match document_context[document].clone() {
                 Document::Text(text) => self.measure_text(
@@ -304,8 +304,7 @@ impl<C: Cost> ChoicelessContext<C> {
         printing_context: PrintingContext,
         document_context: &mut InternedMap<Document>,
         document: DocumentRef,
-        add_indent_amount: usize,
-        children: &[DocumentRef],
+        children: Vec<DocumentRef>,
     ) -> MeasureSet<C> {
         todo!()
     }
@@ -325,10 +324,38 @@ impl<C: Cost> ChoicelessContext<C> {
 
     pub fn resolve_document(
         &mut self,
+        config: &PrintingConfig,
         document_context: &mut InternedMap<Document>,
         printing_context: PrintingContext,
         document: DocumentRef,
     ) -> MeasureSet<C> {
-        todo!()
+        match document_context[document].clone() {
+            Document::Text(text) => {
+                self.resolve_text(config, printing_context, document, &text)
+            }
+            Document::Newline => {
+                self.resolve_newline(config, printing_context, document)
+            }
+            Document::Concat(children) => self.resolve_concat(
+                config,
+                printing_context,
+                document_context,
+                document,
+                children,
+            ),
+            Document::Nest {
+                add_indent_amount,
+                child,
+            } => self.resolve_nest(
+                config,
+                printing_context,
+                document_context,
+                document,
+                add_indent_amount,
+                child,
+            ),
+            Document::Flatten(interned_key) => todo!(),
+            Document::Union(interned_key, interned_key1) => todo!(),
+        }
     }
 }

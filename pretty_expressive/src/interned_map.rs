@@ -114,12 +114,6 @@ impl<T> Index<InternedKey<T>> for InternedMap<T> {
     }
 }
 
-impl<T> IndexMut<InternedKey<T>> for InternedMap<T> {
-    fn index_mut(&mut self, key: InternedKey<T>) -> &mut Self::Output {
-        &mut self.store[key.index]
-    }
-}
-
 pub struct InternedInfoMap<T, V> {
     store: Box<[V]>,
     present: Box<[bool]>,
@@ -163,10 +157,3 @@ impl<T, V> Index<InternedKey<T>> for InternedInfoMap<InternedKey<T>, V> {
         &self.store[key.index]
     }
 }
-
-// impl<T, V> IndexMut<InternedKey<T>> for InternedInfoMap<InternedKey<T>, V> {
-//     fn index_mut(&mut self, key: InternedKey<T>) -> &mut Self::Output {
-//         assert!(self.present[key.index]);
-//         &mut self.store[key.index]
-//     }
-// }
