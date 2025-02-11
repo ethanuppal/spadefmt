@@ -20,10 +20,7 @@ use spade_common::{
 };
 use spade_parser::lexer;
 
-use crate::{
-    config::Config,
-    document::{Document, DocumentIdx, InternedDocumentStore},
-};
+use crate::document::{Document, DocumentIdx, InternedDocumentStore};
 
 pub struct DocumentBuilder {
     indent: isize,
@@ -117,7 +114,7 @@ impl DocumentBuilder {
         list.push(self.text(format!(" {}", unit.head.name)));
 
         if let Some(type_params) = &unit.head.type_params {
-            list.push(self.new_group(
+            list.push(self.group(
                 lexer::TokenKind::Lt,
                 &type_params.inner,
                 lexer::TokenKind::Comma,
@@ -233,10 +230,10 @@ impl DocumentBuilder {
         match &**expression {
             ast::Expression::Identifier(path) => self.build_path(path),
             ast::Expression::IntLiteral(int_literal) => {
-                self.text(&int_literal.to_string())
+                self.text(int_literal.to_string())
             }
             ast::Expression::BoolLiteral(bool_literal) => {
-                self.text(&bool_literal.to_string())
+                self.text(bool_literal.to_string())
             }
             ast::Expression::BitLiteral(bit_literal) => {
                 self.text(match bit_literal {
@@ -245,7 +242,7 @@ impl DocumentBuilder {
                     ast::BitLiteral::HighImp => "UNDEF",
                 })
             }
-            ast::Expression::ArrayLiteral(array_literal) => self.new_group(
+            ast::Expression::ArrayLiteral(array_literal) => self.group(
                 lexer::TokenKind::OpenBracket,
                 array_literal,
                 lexer::TokenKind::Comma,
@@ -317,10 +314,10 @@ impl DocumentBuilder {
     pub fn build_pattern(&self, pattern: &Loc<ast::Pattern>) -> DocumentIdx {
         match &**pattern {
             ast::Pattern::Integer(int_literal) => {
-                self.text(&int_literal.to_string())
+                self.text(int_literal.to_string())
             }
             ast::Pattern::Bool(bool_literal) => {
-                self.text(&bool_literal.to_string())
+                self.text(bool_literal.to_string())
             }
             ast::Pattern::Path(path) => self.build_path(path),
             ast::Pattern::Tuple(vec) => todo!(),
@@ -336,9 +333,7 @@ impl DocumentBuilder {
             ast::TypeExpression::TypeSpec(type_spec) => {
                 self.build_type_spec(type_spec)
             }
-            ast::TypeExpression::Integer(value) => {
-                self.text(&value.to_string())
-            }
+            ast::TypeExpression::Integer(value) => self.text(value.to_string()),
             ast::TypeExpression::ConstGeneric(expression) => {
                 self.build_expression(expression)
             }
@@ -349,7 +344,7 @@ impl DocumentBuilder {
         &self, type_spec: &Loc<ast::TypeSpec>,
     ) -> DocumentIdx {
         match &**type_spec {
-            ast::TypeSpec::Tuple(elements) => self.new_group(
+            ast::TypeSpec::Tuple(elements) => self.group(
                 lexer::TokenKind::OpenParen,
                 elements,
                 lexer::TokenKind::Comma,
@@ -365,7 +360,7 @@ impl DocumentBuilder {
             ast::TypeSpec::Named(path, type_params) => {
                 let mut list = vec![self.build_path(path)];
                 if let Some(params) = type_params {
-                    list.push(self.new_group(
+                    list.push(self.group(
                         lexer::TokenKind::Lt,
                         &params.inner,
                         lexer::TokenKind::Comma,
@@ -392,12 +387,7 @@ impl DocumentBuilder {
                 if !traits.is_empty() {
                     list.extend([
                         self.text(": "),
-                        self.new_group(
-                            None,
-                            traits,
-                            lexer::TokenKind::Plus,
-                            None,
-                        ),
+                        self.group(None, traits, lexer::TokenKind::Plus, None),
                     ])
                 }
                 self.list(list)
@@ -411,7 +401,7 @@ impl DocumentBuilder {
     ) -> DocumentIdx {
         let mut list = vec![self.build_path(&trait_spec.path)];
         if let Some(type_params) = &trait_spec.type_params {
-            list.push(self.new_group(
+            list.push(self.group(
                 lexer::TokenKind::Lt,
                 &type_params.inner,
                 lexer::TokenKind::Comma,
@@ -478,7 +468,7 @@ impl DocumentBuilder {
     pub fn build_parameter_list(
         &self, parameter_list: &Loc<ast::ParameterList>,
     ) -> DocumentIdx {
-        self.new_group(
+        self.group(
             lexer::TokenKind::OpenParen,
             &parameter_list.args,
             lexer::TokenKind::Comma,
@@ -520,7 +510,7 @@ impl DocumentBuilder {
             .add(Document::List(list.into_iter().collect()))
     }
 
-    fn new_group<'a, B: BuildAsDocument + 'a>(
+    fn group<'a, B: BuildAsDocument + 'a>(
         &self, open: impl Into<Option<lexer::TokenKind>>,
         contents: impl IntoIterator<Item = &'a B>,
         between: impl Into<Option<lexer::TokenKind>>,
