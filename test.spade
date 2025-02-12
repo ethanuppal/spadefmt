@@ -9,4 +9,4 @@ entity long_args(very_looooooooooooooooooooong_name_lmaoooooooooooooooo: int<8>)
 
 #[no_mangle]
 #[no_mangle]
-entity foo(#[no_mangle] a: int<8>, #[no_mangle] b: int<8>, #[no_mangle] c: int<8>, #[no_mangle] d: int<8>, #[no_mangle] e: int<8>) {}
+entity foo(#[no_mangle] a: int<8>, #[no_mangle] #[no_mangle] b: int<8>, #[no_mangle] c: int<8>, #[no_mangle] d: int<8>, #[no_mangle] e: int<8>) {}
