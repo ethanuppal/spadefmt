@@ -13,12 +13,13 @@
 
 use crate::document::{Document, DocumentIdx, InternedDocumentStore};
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct PrintingContext {
     max_width: usize,
     column: usize,
     current_indent: usize,
     flatten: bool,
+    trying: bool,
     tainted: bool,
 }
 
@@ -37,6 +38,7 @@ impl PrintingContext {
             self.column = self.current_indent;
         }
         if self.column > self.max_width {
+            //println!("oops tainted {:?}", self);
             self.tainted = true;
         }
     }
@@ -58,6 +60,7 @@ impl PrintingContext {
 }
 
 // TODO: maybe merge top function into this
+/// Invariant: A try will never be expanded after a catch.
 pub fn resolve_try_catch(
     store: &mut InternedDocumentStore, idx: DocumentIdx,
     context: &mut PrintingContext,
@@ -72,11 +75,9 @@ pub fn resolve_try_catch(
             idx
         }
         Document::Nest(body_idx, by) => {
-            let mut nested_context = context.clone();
-            nested_context.indent(by);
-            let new_body_idx =
-                resolve_try_catch(store, body_idx, &mut nested_context);
-            *context = nested_context;
+            context.indent(by);
+            let new_body_idx = resolve_try_catch(store, body_idx, context);
+            context.indent(-by);
             store.add(Document::Nest(new_body_idx, by))
         }
         Document::Flatten(body_idx) => {
@@ -84,26 +85,43 @@ pub fn resolve_try_catch(
             flattened_context.set_flattened();
             let new_body_idx =
                 resolve_try_catch(store, body_idx, &mut flattened_context);
+            flattened_context.flatten = context.flatten;
             *context = flattened_context;
             store.add(Document::Flatten(new_body_idx))
         }
         Document::List(children) => {
-            let mut list_context = context.clone();
             let new_children = children
                 .into_iter()
-                .map(|child| resolve_try_catch(store, child, &mut list_context))
+                .map(|child_idx| resolve_try_catch(store, child_idx, context))
                 .collect();
-            *context = list_context;
             store.add(Document::List(new_children))
         }
         Document::TryCatch(try_body_idx, catch_body_idx) => {
-            let was_tainted = context.tainted;
             let mut try_context = context.clone();
-            try_context.tainted = false;
+            try_context.trying = true;
+
+            //println!("\ntrying from {:?}", try_context);
+            //let mut buffer = String::new();
+            //let mut f = inform::fmt::IndentWriter::new(&mut buffer, 4);
+            //crate::document::debug_print(store, &mut f, try_body_idx)
+            //    .expect("a");
+            //println!("{}", buffer);
+
             let new_try_body_idx =
                 resolve_try_catch(store, try_body_idx, &mut try_context);
-            if try_context.tainted {
+            if try_context.tainted && !context.trying {
                 let mut catch_context = context.clone();
+
+                //println!(
+                //    "\nfailed to flatten, doing nest from {:?}",
+                //    catch_context
+                //);
+                //let mut buffer = String::new();
+                //let mut f = inform::fmt::IndentWriter::new(&mut buffer, 4);
+                //crate::document::debug_print(store, &mut f, catch_body_idx)
+                //    .expect("a");
+                //println!("{}", buffer);
+
                 let new_catch_body_idx = resolve_try_catch(
                     store,
                     catch_body_idx,
@@ -112,8 +130,8 @@ pub fn resolve_try_catch(
                 *context = catch_context;
                 new_catch_body_idx
             } else {
+                try_context.trying = context.trying;
                 *context = try_context;
-                context.tainted = was_tainted;
                 new_try_body_idx
             }
         }

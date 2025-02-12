@@ -77,6 +77,7 @@ impl DocumentBuilder {
         for (i, item) in root.members.iter().enumerate() {
             if i > 0 {
                 list.push(self.newline());
+                list.push(self.newline());
             }
             list.push(self.build_item(item));
         }
@@ -122,18 +123,49 @@ impl DocumentBuilder {
             ));
         }
 
-        list.push(self.build_parameter_list(&unit.head.inputs));
+        let parameter_list_doc = self.build_parameter_list(&unit.head.inputs);
+        let parameter_open = self.token(lexer::TokenKind::OpenParen);
+        let parameter_close = self.token(lexer::TokenKind::CloseParen);
 
-        if let Some((_, output_type)) = &unit.head.output_type {
-            list.extend([self.text(" -> "), self.build_type_spec(output_type)]);
-        }
+        let output_type_doc = if let Some((_, output_type)) =
+            &unit.head.output_type
+        {
+            self.list([self.text(" -> "), self.build_type_spec(output_type)])
+        } else {
+            self.list([])
+        };
+
+        list.push(self.try_catch(
+            self.list([
+                parameter_open,
+                parameter_list_doc.0,
+                parameter_close,
+                self.flatten(output_type_doc),
+            ]),
+            self.try_catch(
+                self.list([
+                    parameter_open,
+                    parameter_list_doc.0,
+                    parameter_close,
+                    self.flatten(output_type_doc),
+                ]),
+                self.list([
+                    parameter_open,
+                    parameter_list_doc.1,
+                    parameter_close,
+                    output_type_doc,
+                ]),
+            ),
+        ));
 
         if !unit.head.where_clauses.is_empty() {
             todo!()
         }
 
         list.push(match &unit.body {
-            Some(body) => self.build_expression(body),
+            Some(body) => {
+                self.list([self.text(" "), self.build_expression(body)])
+            }
             None => self.text(";"),
         });
 
@@ -156,6 +188,7 @@ impl DocumentBuilder {
         let mut list = vec![];
         for (i, item) in body.members.iter().enumerate() {
             if i > 0 {
+                list.push(self.newline());
                 list.push(self.newline());
             }
             list.push(self.build_item(item));
@@ -467,13 +500,8 @@ impl DocumentBuilder {
 
     pub fn build_parameter_list(
         &self, parameter_list: &Loc<ast::ParameterList>,
-    ) -> DocumentIdx {
-        self.group(
-            lexer::TokenKind::OpenParen,
-            &parameter_list.args,
-            lexer::TokenKind::Comma,
-            lexer::TokenKind::CloseParen,
-        )
+    ) -> (DocumentIdx, DocumentIdx) {
+        self.group_raw(&parameter_list.args, lexer::TokenKind::Comma)
     }
 
     fn newline(&self) -> DocumentIdx {
@@ -510,15 +538,11 @@ impl DocumentBuilder {
             .add(Document::List(list.into_iter().collect()))
     }
 
-    fn group<'a, B: BuildAsDocument + 'a>(
-        &self, open: impl Into<Option<lexer::TokenKind>>,
-        contents: impl IntoIterator<Item = &'a B>,
+    fn group_raw<'a, B: BuildAsDocument + 'a>(
+        &self, contents: impl IntoIterator<Item = &'a B>,
         between: impl Into<Option<lexer::TokenKind>>,
-        close: impl Into<Option<lexer::TokenKind>>,
-    ) -> DocumentIdx {
-        let open = open.into();
+    ) -> (DocumentIdx, DocumentIdx) {
         let between = between.into();
-        let close = close.into();
 
         let mut list = vec![];
         for (i, item) in contents
@@ -528,24 +552,34 @@ impl DocumentBuilder {
         {
             if i > 0 {
                 if let Some(ref between) = between {
-                    list.push(self.token(between.clone()));
+                    list.extend([self.token(between.clone()), self.newline()]);
                 }
             }
             list.push(item);
-            if i > 0 {
-                list.push(self.newline());
-            }
         }
         let doc_contents = self.list(list);
         // try to flatten, otherwise nest
-        let try_catch = self.try_catch(
+        (
             self.flatten(doc_contents),
             self.list([
                 self.newline(),
                 self.nest(doc_contents, self.indent),
                 self.newline(),
             ]),
-        );
+        )
+    }
+
+    fn group<'a, B: BuildAsDocument + 'a>(
+        &self, open: impl Into<Option<lexer::TokenKind>>,
+        contents: impl IntoIterator<Item = &'a B>,
+        between: impl Into<Option<lexer::TokenKind>>,
+        close: impl Into<Option<lexer::TokenKind>>,
+    ) -> DocumentIdx {
+        let open = open.into();
+        let close = close.into();
+
+        let (try_body_idx, catch_body_idx) = self.group_raw(contents, between);
+        let try_catch = self.try_catch(try_body_idx, catch_body_idx);
         let mut main_list = vec![];
         if let Some(open) = open {
             main_list.push(self.token(open));
