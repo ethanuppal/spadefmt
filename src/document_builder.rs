@@ -147,7 +147,7 @@ impl DocumentBuilder {
                     parameter_open,
                     parameter_list_doc.0,
                     parameter_close,
-                    self.flatten(output_type_doc),
+                    output_type_doc,
                 ]),
                 self.list([
                     parameter_open,
@@ -579,15 +579,18 @@ impl DocumentBuilder {
         let close = close.into();
 
         let (try_body_idx, catch_body_idx) = self.group_raw(contents, between);
-        let try_catch = self.try_catch(try_body_idx, catch_body_idx);
-        let mut main_list = vec![];
+        let mut try_list = vec![];
+        let mut catch_list = vec![];
         if let Some(open) = open {
-            main_list.push(self.token(open));
+            try_list.push(self.token(open.clone()));
+            catch_list.push(self.token(open));
         }
-        main_list.push(try_catch);
+        try_list.push(try_body_idx);
+        catch_list.push(catch_body_idx);
         if let Some(close) = close {
-            main_list.push(self.token(close));
+            try_list.push(self.token(close.clone()));
+            catch_list.push(self.token(close));
         }
-        self.list(main_list)
+        self.try_catch(self.list(try_list), self.list(catch_list))
     }
 }

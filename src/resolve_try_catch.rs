@@ -18,6 +18,7 @@ pub struct PrintingContext {
     max_width: usize,
     column: usize,
     current_indent: usize,
+    applied_indent: bool,
     flatten: bool,
     trying: bool,
     tainted: bool,
@@ -35,10 +36,9 @@ impl PrintingContext {
         if self.flatten {
             self.column += 1;
         } else {
-            self.column = self.current_indent;
+            self.applied_indent = false;
         }
         if self.column > self.max_width {
-            //println!("oops tainted {:?}", self);
             self.tainted = true;
         }
     }
@@ -48,6 +48,10 @@ impl PrintingContext {
     }
 
     fn push(&mut self, length: usize) {
+        if !self.applied_indent {
+            self.column = self.current_indent;
+            self.applied_indent = true;
+        }
         self.column += length;
         if self.column > self.max_width {
             self.tainted = true;
@@ -111,6 +115,7 @@ pub fn resolve_try_catch(
                 resolve_try_catch(store, try_body_idx, &mut try_context);
             if try_context.tainted && !context.trying {
                 let mut catch_context = context.clone();
+                catch_context.tainted = false;
 
                 //println!(
                 //    "\nfailed to flatten, doing nest from {:?}",
@@ -128,10 +133,12 @@ pub fn resolve_try_catch(
                     &mut catch_context,
                 );
                 *context = catch_context;
+                //println!("\nnested (now tainted = {})", context.tainted);
                 new_catch_body_idx
             } else {
                 try_context.trying = context.trying;
                 *context = try_context;
+                //println!("\nflattened (now tainted = {})", context.tainted);
                 new_try_body_idx
             }
         }
