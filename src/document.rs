@@ -59,8 +59,10 @@ impl InternedDocumentStore {
 }
 
 pub fn print_resolved<W: fmt::Write>(
-    store: &InternedDocumentStore, f: &mut inform::fmt::IndentWriter<W>,
-    idx: DocumentIdx, flattened: bool,
+    store: &InternedDocumentStore,
+    f: &mut inform::fmt::IndentWriter<W>,
+    idx: DocumentIdx,
+    flattened: bool,
 ) -> fmt::Result {
     match store.get(idx) {
         Document::Newline => {
@@ -100,7 +102,8 @@ pub fn print_resolved<W: fmt::Write>(
 }
 
 pub fn debug_print<W: fmt::Write>(
-    store: &InternedDocumentStore, f: &mut inform::fmt::IndentWriter<W>,
+    store: &InternedDocumentStore,
+    f: &mut inform::fmt::IndentWriter<W>,
     idx: DocumentIdx,
 ) -> fmt::Result {
     match store.get(idx) {

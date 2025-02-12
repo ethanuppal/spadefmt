@@ -538,29 +538,45 @@ impl DocumentBuilder {
                     self.build_expression(false_branch),
                 ]),
             ast::Expression::Match(against, arms) => {
-                let mut list = vec![
-                    self.text("match "),
-                    self.build_expression(against),
-                    self.text(" "),
-                ];
+                let mut list =
+                    vec![self.text("match "), self.build_expression(against)];
                 if !arms.is_empty() {
                     let mut arm_list = vec![];
                     for arm in &arms.inner {
-                        arm_list.push(self.list([
-                            self.build_pattern(&arm.0),
+                        let pattern = self.build_pattern(&arm.0);
+                        let case = self.list([
                             self.text(format!(
                                 " {} ",
                                 lexer::TokenKind::FatArrow.as_str()
                             )),
                             self.build_expression(&arm.1),
-                        ]));
+                        ]);
+                        arm_list.push(self.try_catch(
+                            self.list([
+                                self.flatten(pattern),
+                                self.flatten(case),
+                            ]),
+                            self.try_catch(
+                                self.list([self.flatten(pattern), case]),
+                                self.list([pattern, case]),
+                            ),
+                        ));
                     }
-                    list.push(self.group(
-                        lexer::TokenKind::OpenBrace.as_str(),
-                        &arm_list,
-                        lexer::TokenKind::Comma,
-                        lexer::TokenKind::CloseBrace.as_str(),
-                    ));
+
+                    let arms_doc =
+                        self.group_raw(&arm_list, lexer::TokenKind::Comma);
+                    list.extend([
+                        self.text(" {"),
+                        self.try_catch(
+                            self.list([
+                                self.text(" "),
+                                arms_doc.0,
+                                self.text(" "),
+                            ]),
+                            arms_doc.1,
+                        ),
+                        self.text("}"),
+                    ]);
                 }
                 self.list(list)
             }
@@ -885,9 +901,6 @@ impl DocumentBuilder {
                 self.newline(),
                 self.nest(self.text("self,"), self.indent),
             ]);
-            if continues {
-                catch_list.push(self.newline());
-            }
         }
         let (try_idx, catch_idx) =
             self.group_raw(&parameter_list.args, lexer::TokenKind::Comma);
