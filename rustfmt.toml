@@ -1,0 +1,8 @@
+# Copyright (c) 2024 Ethan Uppal. All rights reserved.
+
+format_code_in_doc_comments = true
+max_width = 80
+comment_width = 80
+wrap_comments = true
+match_arm_leading_pipes = "Preserve"
+imports_granularity = "Crate"
