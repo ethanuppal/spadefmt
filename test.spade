@@ -5,6 +5,10 @@ pipeline(4) foo(clk: clock) {
     let b = 4;
 }
 
+entity bar(
+    #[no_mangle] longggggggggggggggggggggggggggggggggggggggggggggggggggggg: int<8>
+) {}
+
 entity long_args(very_looooooooooooooooooooong_name_lmaoooooooooooooooo: int<8>) -> int<8> {}
 
 #[no_mangle]
