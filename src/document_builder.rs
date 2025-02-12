@@ -418,9 +418,31 @@ impl DocumentBuilder {
             ast::TypeParam::TypeName { name, traits } => {
                 let mut list = vec![self.text(name.to_string())];
                 if !traits.is_empty() {
+                    let mut flatten_list = vec![];
+                    let mut nest_list = vec![];
+                    for (i, trait_spec) in traits.iter().enumerate() {
+                        if i > 0 {
+                            flatten_list.push(self.text(format!(
+                                " {} ",
+                                lexer::TokenKind::Plus.as_str()
+                            )));
+                            nest_list.extend([
+                                self.newline(),
+                                self.text(format!(
+                                    "{} ",
+                                    lexer::TokenKind::Plus.as_str()
+                                )),
+                            ])
+                        }
+                        flatten_list.push(self.build_trait_spec(trait_spec));
+                        nest_list.push(self.build_trait_spec(trait_spec));
+                    }
                     list.extend([
                         self.text(": "),
-                        self.group(None, traits, lexer::TokenKind::Plus, None),
+                        self.try_catch(
+                            self.flatten(self.list(flatten_list)),
+                            self.nest(self.list(nest_list), self.indent),
+                        ),
                     ])
                 }
                 self.list(list)
