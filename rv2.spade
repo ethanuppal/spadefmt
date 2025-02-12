@@ -1,0 +1,62 @@
+
+use std::ports::new_mut_wire;
+use std::ports::read_mut_wire;
+use std::mem::fifo;
+
+struct port Rv<T> {
+    data: &Option<T>,
+    ready: inv &bool
+}
+
+impl<T> Rv<T> {
+    /// Decouples the producer from the consumer by inserting a buffer register between them.
+    /// This both allows producers and consumers to work in parallel, and also breaks the `ready`
+    /// combinational path
+    ///
+    /// However, this decoupling of the ready signal means that the throughput is at most 50%
+    /// of the time, so for a high throughput stream, this should not be used
+    entity buffer(self, clk: clock, rst: bool) -> Rv<T> {
+        let ds = inst new_mut_wire();
+
+        reg(clk) value reset(rst: None) = match (value, *self.data) {
+            (Some(_), _) => if inst read_mut_wire(ds) {
+                None
+            } else {
+                value
+            },
+            (None, Some(new)) => Some(new),
+            (None, None) => None
+        };
+
+        set self.ready = value.is_none();
+
+        Rv$(
+            data: &value,
+            ready: ds
+        )
+    }
+
+    /// Buffers the values using a FIFO, which can be used to cross clock domains.
+    entity fifo_buffer<#uint Depth, #uint AddrWidth>(
+        self,
+        write_clk: clock,
+        write_rst: bool,
+        read_clk: clock,
+        read_rst: bool,
+    ) -> Rv<T> {
+        let write_full = inst new_mut_wire();
+        set self.ready = !inst read_mut_wire(write_full);
+        (*self.data).inst into_rv_fifo::<Depth, AddrWidth>$(
+            write_clk, write_rst, write_full,
+            read_clk, read_rst,
+        )
+    }
+
+    entity terminate_unready(self) {
+        set self.ready = false;
+    }
+
+    entity terminate_ready(self) {
+        set self.ready = true;
+    }
+}
