@@ -1,6 +1,3 @@
-[submodule "tree-sitter-spade"]
-	path = tree-sitter-spade
-	url = https://gitlab.com/spade-lang/tree-sitter-spade
 [submodule "crates/tree-sitter-spade"]
 	path = crates/tree-sitter-spade
 	url = https://gitlab.com/spade-lang/tree-sitter-spade

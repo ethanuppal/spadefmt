@@ -61,4 +61,6 @@ toml.workspace = true
 derivative.workspace = true
 inform.workspace = true
 
+tree-sitter-spade = { path = "crates/tree-sitter-spade" }
 type-sitter-spade = { path = "crates/type-sitter-spade" }
+type-sitter.workspace = true

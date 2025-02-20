@@ -1173,6 +1173,8 @@ dependencies = [
  "spade-lang",
  "spade-parser",
  "toml",
+ "tree-sitter-spade",
+ "type-sitter",
  "type-sitter-spade",
 ]
 
