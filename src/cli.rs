@@ -19,6 +19,10 @@ use camino::Utf8PathBuf;
 /// Format Spade code
 #[derive(Default, FromArgs)]
 pub struct Opts {
+    /// config file
+    #[argh(option, default = "Utf8PathBuf::from(\"spadefmt.toml\")")]
+    pub config: Utf8PathBuf,
+
     /// disable colored output
     #[argh(switch)]
     pub no_color: bool,
