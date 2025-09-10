@@ -15,7 +15,7 @@ use std::fmt::{self, Debug};
 
 use derivative::Derivative;
 use serde::Deserialize;
-use string16::{string16, String16};
+use string16::{String16, string16};
 
 mod string16 {
     pub type String16 = u128;
@@ -29,7 +29,7 @@ mod string16 {
         let mut result = 0u128;
 
         macro_rules! pack_bytes {
-            (&mut $result:expr, $str:expr, $($idx:expr),*) => {
+            (&mut $result:expr_2021, $str:expr_2021, $($idx:expr_2021),*) => {
                 $(
                     if $str.len() > $idx {
                         $result |= ($str.as_bytes()[$idx] as u128) << ($idx * 8);
@@ -123,11 +123,11 @@ pub struct BoundedConfigUsize<
 }
 
 impl<
-        const LOWER_BOUND: usize,
-        const UPPER_BOUND: usize,
-        const DEFAULT: usize,
-        const UNITS: String16,
-    > TryFrom<usize>
+    const LOWER_BOUND: usize,
+    const UPPER_BOUND: usize,
+    const DEFAULT: usize,
+    const UNITS: String16,
+> TryFrom<usize>
     for BoundedConfigUsize<LOWER_BOUND, UPPER_BOUND, DEFAULT, UNITS>
 {
     type Error = BoundedIntegerParseError;
@@ -144,11 +144,11 @@ impl<
 }
 
 impl<
-        const LOWER_BOUND: usize,
-        const UPPER_BOUND: usize,
-        const DEFAULT: usize,
-        const UNITS: String16,
-    > Debug for BoundedConfigUsize<LOWER_BOUND, UPPER_BOUND, DEFAULT, UNITS>
+    const LOWER_BOUND: usize,
+    const UPPER_BOUND: usize,
+    const DEFAULT: usize,
+    const UNITS: String16,
+> Debug for BoundedConfigUsize<LOWER_BOUND, UPPER_BOUND, DEFAULT, UNITS>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(f)
@@ -156,12 +156,11 @@ impl<
 }
 
 impl<
-        const LOWER_BOUND: usize,
-        const UPPER_BOUND: usize,
-        const DEFAULT: usize,
-        const UNITS: String16,
-    > From<BoundedConfigUsize<LOWER_BOUND, UPPER_BOUND, DEFAULT, UNITS>>
-    for usize
+    const LOWER_BOUND: usize,
+    const UPPER_BOUND: usize,
+    const DEFAULT: usize,
+    const UNITS: String16,
+> From<BoundedConfigUsize<LOWER_BOUND, UPPER_BOUND, DEFAULT, UNITS>> for usize
 {
     fn from(
         val: BoundedConfigUsize<LOWER_BOUND, UPPER_BOUND, DEFAULT, UNITS>,

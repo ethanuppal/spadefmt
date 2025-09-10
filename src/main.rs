@@ -20,17 +20,17 @@ use std::{
     sync::RwLock,
 };
 
-use snafu::{whatever, ResultExt, Whatever};
+use snafu::{ResultExt, Whatever, whatever};
 pub use spade;
 use spade_codespan_reporting::{files::SimpleFiles, term::termcolor::Buffer};
-use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
+use spade_diagnostics::{CodeBundle, DiagHandler, emitter::CodespanEmitter};
 use spade_parser::logos::Logos;
 use spadefmt::{
     cli::Opts,
     config::Config,
     document,
     document_builder::DocumentBuilder,
-    resolve_try_catch::{resolve_try_catch, PrintingContext},
+    resolve_try_catch::{PrintingContext, resolve_try_catch},
 };
 
 #[snafu::report]
@@ -90,8 +90,8 @@ fn main() -> Result<(), Whatever> {
         }
     };
 
-    let test_contents = fs::read_to_string("test.toml")
-        .whatever_context("test file test.toml should be there")?;
+    let test_contents = fs::read_to_string("spadefmt.toml")
+        .whatever_context("test file spadefmt.toml should be there")?;
     let test_config = toml::from_str::<Config>(&test_contents)
         .whatever_context("Failed to decode config")?;
 
