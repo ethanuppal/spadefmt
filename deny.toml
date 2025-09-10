@@ -38,14 +38,13 @@ gitlab = ["spade-lang"]
 
 [licenses]
 allow = [
-  "GPL-3.0",
+  "GPL-3.0-only",
   "MIT",
   "Apache-2.0",
   "MPL-2.0",
   "EUPL-1.2",
-  "ISC",
   "Unicode-3.0",
-  "LGPL-3.0",
+  "LGPL-3.0-or-later",
   "BSD-3-Clause",
 ]
 confidence-threshold = 1.0

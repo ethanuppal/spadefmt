@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 authors = ["Ethan Uppal"]
 description = "Opinionated code formatter for the Spade language"
-license = "GPL-3.0"
+license = "GPL-3.0-only"
 keywords = ["spadefmt", "formatter", "autoformat"]
 categories = ["development-tools"]
 version = "0.0.0"
