@@ -29,7 +29,7 @@ mod string16 {
         let mut result = 0u128;
 
         macro_rules! pack_bytes {
-            (&mut $result:expr, $str:expr, $($idx:expr),*) => {
+            (&mut $result:expr_2021, $str:expr_2021, $($idx:expr_2021),*) => {
                 $(
                     if $str.len() > $idx {
                         $result |= ($str.as_bytes()[$idx] as u128) << ($idx * 8);
