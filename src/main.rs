@@ -90,8 +90,8 @@ fn main() -> Result<(), Whatever> {
         }
     };
 
-    let test_contents = fs::read_to_string("test.toml")
-        .whatever_context("test file test.toml should be there")?;
+    let test_contents = fs::read_to_string("spadefmt.toml")
+        .whatever_context("test file spadefmt.toml should be there")?;
     let test_config = toml::from_str::<Config>(&test_contents)
         .whatever_context("Failed to decode config")?;
 

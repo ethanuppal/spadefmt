@@ -66,7 +66,8 @@ impl PrintingContext {
 // TODO: maybe merge top function into this
 /// Invariant: A try will never be expanded after a catch.
 pub fn resolve_try_catch(
-    store: &mut InternedDocumentStore, idx: DocumentIdx,
+    store: &mut InternedDocumentStore,
+    idx: DocumentIdx,
     context: &mut PrintingContext,
 ) -> DocumentIdx {
     match store.get(idx).clone() {
