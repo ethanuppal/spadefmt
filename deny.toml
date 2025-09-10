@@ -1,0 +1,51 @@
+[graph]
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-unknown-linux-musl",
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
+all-features = true
+
+[advisories]
+ignore = ["RUSTSEC-2024-0388"]
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+skip = [
+  { crate = "windows_x86_64_msvc@0.52.6", reason = "spade uses this old version" },
+  { crate = "windows_x86_64_gnu@0.52.6", reason = "spade uses this old version" },
+  { crate = "windows-targets@0.52.6", reason = "spade uses this old version" },
+  { crate = "windows-sys@0.52.0", reason = "spade uses this old version" },
+  { crate = "windows-sys@0.59.0", reason = "spade uses this old version" },
+  { crate = "windows-sys@0.60.2", reason = "spade uses this old version" },
+  { crate = "toml_datetime@0.6.11", reason = "inform@0.3.4 uses this old version" },
+  { crate = "toml@0.8.23", reason = "inform@0.3.4 uses this old version" },
+  { crate = "serde_spanned@0.6.9", reason = "inform@0.3.4 uses this old version" },
+  { crate = "syn@1.0.109", reason = "derivative@2.2.0 uses this old version" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+required-git-spec = "rev"
+
+[sources.allow-org]
+gitlab = ["spade-lang"]
+
+[licenses]
+allow = [
+  "GPL-3.0",
+  "MIT",
+  "Apache-2.0",
+  "MPL-2.0",
+  "EUPL-1.2",
+  "ISC",
+  "Unicode-3.0",
+  "LGPL-3.0",
+  "BSD-3-Clause",
+]
+confidence-threshold = 1.0
