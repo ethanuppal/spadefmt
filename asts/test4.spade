@@ -1,0 +1,16 @@
+impl Rv<uint<16>> {
+    entity split_to_u8(self, clk: clock, rst: bool) -> Rv<uint<8>> {
+        let ds = inst new_mut_wire();
+
+        reg(clk) state reset(rst: U8SplitState::Empty) =
+            match (state, inst read_mut_wire(ds), *self.data) {
+                (U8SplitState::Empty, _, None) => U8SplitState::Empty,
+                (U8SplitState::Empty, true, Some(data)) => U8SplitState::Half(trunc(data >> 8)),
+                (U8SplitState::Empty, false, Some(data)) => U8SplitState::Full(data),
+                (_, false, _) => state,
+                (U8SplitState::Full(val), true, _) => U8SplitState::Half(trunc(val >> 8)),
+                (U8SplitState::Half(val), true, None) => U8SplitState::Empty,
+                (U8SplitState::Half(val), true, Some(data)) => U8SplitState::Full(data),
+        };
+    }
+}

@@ -72,9 +72,9 @@ pub type AstParameter =
 
 can_build!(AstParameter: build_parameter);
 
-pub type EnumVariant = (Loc<Identifier>, Option<Loc<ast::ParameterList>>);
+// pub type EnumVariant = (Loc<Identifier>, Option<Loc<ast::ParameterList>>);
 
-can_build!(EnumVariant: build_enum_variant);
+can_build!(ast::EnumVariant: build_enum_variant);
 
 impl DocumentBuilder {
     pub fn new(indent: isize) -> Self {
@@ -206,8 +206,8 @@ impl DocumentBuilder {
                         lexer::TokenKind::Gt.as_str(),
                     ));
                 }
-                let options_doc =
-                    self.group_raw(&enum_decl.options, lexer::TokenKind::Comma);
+                let options_doc = self
+                    .group_raw(&enum_decl.variants, lexer::TokenKind::Comma);
                 list.extend([
                     self.text(" {"),
                     self.try_catch(
@@ -255,9 +255,12 @@ impl DocumentBuilder {
         }
     }
 
-    pub fn build_enum_variant(&self, variant: &EnumVariant) -> DocumentIdx {
-        let mut list = vec![self.text(variant.0.to_string())];
-        if let Some(parameter_list) = &variant.1 {
+    pub fn build_enum_variant(
+        &self,
+        variant: &ast::EnumVariant,
+    ) -> DocumentIdx {
+        let mut list = vec![self.text(variant.name.to_string())];
+        if let Some(parameter_list) = &variant.args {
             let parameter_list_doc = self.build_parameter_list(parameter_list);
             list.push(
                 self.try_catch(parameter_list_doc.0, parameter_list_doc.1),
@@ -427,6 +430,7 @@ impl DocumentBuilder {
                 self.build_expression(value),
             ],
             ast::Statement::Assert(loc) => todo!(),
+            ast::Statement::Expression(loc) => todo!(),
         };
         list.push(self.text(";"));
         self.list(list)
@@ -445,7 +449,7 @@ impl DocumentBuilder {
                 self.text(bool_literal.to_string())
             }
             ast::Expression::BitLiteral(bit_literal) => {
-                self.text(match bit_literal {
+                self.text(match **bit_literal {
                     ast::BitLiteral::Low => "LOW",
                     ast::BitLiteral::High => "HIGH",
                     ast::BitLiteral::HighImp => "UNDEF",
@@ -626,6 +630,19 @@ impl DocumentBuilder {
             ast::Expression::TypeLevelIf(loc, loc1, loc2) => todo!(),
             ast::Expression::StageValid => todo!(),
             ast::Expression::StageReady => todo!(),
+            ast::Expression::StrLiteral(loc) => todo!(),
+            ast::Expression::Parenthesized(inner) => self.list([
+                self.token(lexer::TokenKind::OpenParen),
+                self.build_expression(inner),
+                self.token(lexer::TokenKind::CloseParen),
+            ]),
+            ast::Expression::Lambda {
+                unit_kind,
+                args,
+                body,
+            } => todo!(),
+            ast::Expression::Unsafe(loc) => todo!(),
+            ast::Expression::StaticUnreachable(loc) => todo!(),
         }
     }
 
@@ -730,6 +747,7 @@ impl DocumentBuilder {
             ast::TypeExpression::ConstGeneric(expression) => {
                 self.build_expression(expression)
             }
+            ast::TypeExpression::String(string) => todo!(),
         }
     }
 
@@ -849,6 +867,10 @@ impl DocumentBuilder {
             } => todo!(),
             ast::Attribute::WalTrace { clk, rst } => todo!(),
             ast::Attribute::WalSuffix { suffix } => todo!(),
+            ast::Attribute::Documentation { content } => {
+                self.text(format!("///{content}"))
+            }
+            ast::Attribute::SurferTranslator(string) => todo!(),
         }
     }
 

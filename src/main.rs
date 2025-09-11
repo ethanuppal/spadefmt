@@ -67,12 +67,11 @@ fn main() -> Result<(), Whatever> {
         Buffer::ansi()
     };
 
-    let mut error_handler = spade::ErrorHandler {
-        failed: false,
-        error_buffer: &mut buffer,
-        diag_handler: diagnostic_handler,
-        code: code_bundle,
-    };
+    let mut error_handler = spade::error_handling::ErrorHandler::new(
+        &mut buffer,
+        diagnostic_handler,
+        code_bundle,
+    );
 
     let mut parser = spade_parser::Parser::new(
         spade_parser::lexer::TokenKind::lexer(&code),
@@ -83,7 +82,7 @@ fn main() -> Result<(), Whatever> {
         Ok(root) => root,
         Err(error) => {
             error_handler.report(&error);
-            for error in &parser.errors {
+            for error in &parser.diags.errors {
                 error_handler.report(error);
             }
             whatever!("Exiting due to errors")
