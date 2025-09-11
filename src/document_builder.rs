@@ -508,9 +508,8 @@ impl DocumentBuilder {
                 turbofish,
             } => {
                 let mut list = vec![
-                    self.text("("),
                     self.build_expression(target),
-                    self.text(")."),
+                    self.token(lexer::TokenKind::Dot),
                 ];
                 list.extend(match kind {
                     ast::CallKind::Function => vec![],
