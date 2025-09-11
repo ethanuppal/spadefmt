@@ -131,15 +131,35 @@ dependencies = [
 
 [[package]]
 name = "base64"
-version = "0.21.7"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "beef"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
+
+[[package]]
+name = "bincode"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
+dependencies = [
+ "bincode_derive",
+ "serde",
+ "unty",
+]
+
+[[package]]
+name = "bincode_derive"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf95709a440f45e986983918d0e8a1f30a9b1df04918fc828670606804ac3c09"
+dependencies = [
+ "virtue",
+]
 
 [[package]]
 name = "bitflags"
@@ -164,6 +184,16 @@ checksum = "5fbd1fe9db3ebf71b89060adaf7b0504c2d6a425cf061313099547e382c2e472"
 dependencies = [
  "serde",
  "toml 0.8.23",
+]
+
+[[package]]
+name = "cc"
+version = "1.2.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5252b3d2648e5eedbc1a6f501e3c795e07025c1e93bbf8bbdd6eef7f447a6d54"
+dependencies = [
+ "find-msvc-tools",
+ "shlex",
 ]
 
 [[package]]
@@ -297,6 +327,18 @@ dependencies = [
  "indenter",
  "once_cell",
 ]
+
+[[package]]
+name = "fastrand"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+
+[[package]]
+name = "find-msvc-tools"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fd99930f64d146689264c637b5af2f0233a933bef0d8570e2526bf9e083192d"
 
 [[package]]
 name = "fnv"
@@ -595,12 +637,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "psm"
+version = "0.1.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e944464ec8536cd1beb0bbfd96987eb5e3b72f2ecdafdc5c769a37f1fa2ae1f"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1885c039570dc00dcb4ff087a89e185fd56bae234ddc7f056a945bf36467248d"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "recursive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0786a43debb760f491b1bc0269fe5e84155353c67482b9e60d0cfb596054b43e"
+dependencies = [
+ "recursive-proc-macro-impl",
+ "stacker",
+]
+
+[[package]]
+name = "recursive-proc-macro-impl"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76009fbe0614077fc1a2ce255e3a1881a2e3a3527097d5dc6d8212c585e7e38b"
+dependencies = [
+ "quote",
+ "syn 2.0.106",
 ]
 
 [[package]]
@@ -622,14 +693,15 @@ checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
 
 [[package]]
 name = "ron"
-version = "0.8.1"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b91f7eff05f748767f183df4320a63d6936e9c6107d97c9e6bdd9784f4289c94"
+checksum = "beceb6f7bf81c73e73aeef6dd1356d9a1b2b4909e1f0fc3e59b034f9572d7b7f"
 dependencies = [
  "base64",
  "bitflags",
  "serde",
  "serde_derive",
+ "unicode-ident",
 ]
 
 [[package]]
@@ -725,6 +797,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "shlex"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
+
+[[package]]
 name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -753,9 +831,8 @@ dependencies = [
 
 [[package]]
 name = "spade-ast"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d81a033cd94984203011a7eaf6a89be943bf21550220edce37dd2fdaa4cd760"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "itertools",
  "num",
@@ -764,13 +841,13 @@ dependencies = [
 
 [[package]]
 name = "spade-ast-lowering"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccf3602075bc9806658d99086f3b02ab0dff031c09b58dee1fd58f42a125262c"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "itertools",
  "local-impl",
  "num",
+ "recursive",
  "spade-ast",
  "spade-common",
  "spade-diagnostics",
@@ -803,9 +880,8 @@ dependencies = [
 
 [[package]]
 name = "spade-common"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cda34edab5c989d8cff5208b6c9eb18f0f00a3869809d48374be80051a60883e"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "logos",
  "num",
@@ -816,9 +892,8 @@ dependencies = [
 
 [[package]]
 name = "spade-diagnostics"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8021492a048e7b3c1d00f8d8e7c8fd25675416ad664c978b614fca6fe886ed5"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "itertools",
  "spade-codespan",
@@ -828,12 +903,12 @@ dependencies = [
 
 [[package]]
 name = "spade-hir"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29ffd13815347369ab16007ef0f9a6f56cd6a747f99039fedf5555d874a39c88"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "colored",
  "itertools",
+ "nesty",
  "num",
  "serde",
  "spade-common",
@@ -845,9 +920,8 @@ dependencies = [
 
 [[package]]
 name = "spade-hir-lowering"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b50c9aa5fa0d34cac8c9eeaddf143e24b76fd4dd89720a5e70d4c6c4f404e2b2"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "itertools",
  "local-impl",
@@ -864,10 +938,10 @@ dependencies = [
 
 [[package]]
 name = "spade-lang"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "650b30c04b2257eee79fb74d575c6d96d2be093e0b93460b51979958f520cf70"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
+ "bincode",
  "clap",
  "color-eyre",
  "colored",
@@ -897,9 +971,8 @@ dependencies = [
 
 [[package]]
 name = "spade-macros"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea117a2e79c73c15f53191fa88ee83fab2db741a05d84bff2b40130951f81e25"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -908,9 +981,8 @@ dependencies = [
 
 [[package]]
 name = "spade-mir"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47f352c22d72eca48bc29d0ce4c62b1f65b7719ce63b09797b4d4f8cd6ab8126"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "derive-where",
  "indoc",
@@ -925,9 +997,8 @@ dependencies = [
 
 [[package]]
 name = "spade-parser"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24732280292503c16118389b25bcbe8e87d90a5edbae6a0e4fa27a4ff4541517"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "colored",
  "itertools",
@@ -944,11 +1015,11 @@ dependencies = [
 
 [[package]]
 name = "spade-typeinference"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "405a57d8fd7645c4ad07110cb0eca018ebbe08c4889de21e04c8ab08b5f170fa"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "colored",
+ "fastrand",
  "itertools",
  "num",
  "serde",
@@ -962,9 +1033,8 @@ dependencies = [
 
 [[package]]
 name = "spade-types"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "501eb3873f20a3461475544d00f16230ab55417293c9733d6ea27582fcd3b745"
+version = "0.14.0"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
 dependencies = [
  "num",
  "serde",
@@ -988,6 +1058,19 @@ dependencies = [
  "spade-lang",
  "spade-parser",
  "toml 0.9.5",
+]
+
+[[package]]
+name = "stacker"
+version = "0.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cddb07e32ddb770749da91081d8d0ac3a16f1a569a18b20348cd371f5dead06b"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "psm",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1218,6 +1301,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a1a07cc7db3810833284e8d372ccdc6da29741639ecc70c9ec107df0fa6154c"
 
 [[package]]
+name = "unty"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
+
+[[package]]
 name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1228,6 +1317,12 @@ name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
+
+[[package]]
+name = "virtue"
+version = "0.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
 
 [[package]]
 name = "winapi-util"

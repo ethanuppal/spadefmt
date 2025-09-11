@@ -17,12 +17,12 @@ argh = "0.1.13"
 camino = "1.1.9"
 snafu = "0.8.5"
 
-spade-lang = "0.12.2"
-spade-diagnostics = "0.12.2"
-spade-parser = "0.12.2"
+spade-lang = { git = "https://gitlab.com/spade-lang/spade.git", rev = "b8f65d0fc858d8b1a6e852959649630e591e041b" }
+spade-diagnostics = { git = "https://gitlab.com/spade-lang/spade.git", rev = "b8f65d0fc858d8b1a6e852959649630e591e041b" }
+spade-parser = { git = "https://gitlab.com/spade-lang/spade.git", rev = "b8f65d0fc858d8b1a6e852959649630e591e041b" }
 spade-codespan-reporting = "0.12.0"
-spade-ast = "0.12.2"
-spade-common = "0.12.2"
+spade-ast = { git = "https://gitlab.com/spade-lang/spade.git", rev = "b8f65d0fc858d8b1a6e852959649630e591e041b" }
+spade-common = { git = "https://gitlab.com/spade-lang/spade.git", rev = "b8f65d0fc858d8b1a6e852959649630e591e041b" }
 
 serde = { version = "1.0.217", features = ["derive"] }
 toml = "0.9.5"
