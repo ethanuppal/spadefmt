@@ -312,7 +312,7 @@ impl DocumentBuilder {
         let mut line = vec![self.text("use "), self.build_path(path)];
 
         if let Some(alias) = alias {
-            line.push(self.text(format!(" as {}", alias)));
+            line.push(self.text(format!(" as {alias}")));
         }
 
         line.push(self.text(";"));
@@ -482,7 +482,7 @@ impl DocumentBuilder {
             ast::Expression::TupleIndex(loc, loc1) => todo!(),
             ast::Expression::FieldAccess(parent, field) => self.list([
                 self.build_expression(parent),
-                self.text(format!(".{}", field)),
+                self.text(format!(".{field}")),
             ]),
             ast::Expression::CreatePorts => todo!(),
             ast::Expression::Call {
@@ -601,7 +601,7 @@ impl DocumentBuilder {
             }
             ast::Expression::BinaryOperator(left, op, right) => self.list([
                 self.build_expression(left),
-                self.text(format!(" {} ", op)),
+                self.text(format!(" {op} ")),
                 self.build_expression(right),
             ]),
             ast::Expression::Block(block) => {
@@ -698,7 +698,7 @@ impl DocumentBuilder {
     ) -> DocumentIdx {
         match named_argument {
             ast::NamedArgument::Full(name, current) => self.list([
-                self.text(format!("{}: ", name)),
+                self.text(format!("{name}: ")),
                 self.build_expression(current),
             ]),
             ast::NamedArgument::Short(name) => self.text(name.to_string()),
@@ -836,7 +836,7 @@ impl DocumentBuilder {
                 self.list(list)
             }
             ast::TypeParam::TypeWithMeta { meta, name } => {
-                self.text(format!("#{} {}", meta, name))
+                self.text(format!("#{meta} {name}"))
             }
         }
     }

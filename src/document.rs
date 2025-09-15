@@ -72,7 +72,7 @@ pub fn print_resolved<W: fmt::Write>(
                 writeln!(f)
             }
         }
-        Document::Text(text) => write!(f, "{}", text),
+        Document::Text(text) => write!(f, "{text}"),
         Document::Nest(body_idx, by) => {
             // TODO: extend indent formatter
             if *by > 0 {
@@ -108,12 +108,12 @@ pub fn debug_print<W: fmt::Write>(
 ) -> fmt::Result {
     match store.get(idx) {
         Document::Newline => write!(f, "Newline"),
-        Document::Text(text) => write!(f, "Text(\"{}\")", text),
+        Document::Text(text) => write!(f, "Text(\"{text}\")"),
         Document::Nest(body_idx, by) => {
             writeln!(f, "Nest(")?;
             f.increase_indent();
             debug_print(store, f, *body_idx)?;
-            writeln!(f, ",\n{}", by)?;
+            writeln!(f, ",\n{by}")?;
             f.decrease_indent();
             write!(f, ")")
         }

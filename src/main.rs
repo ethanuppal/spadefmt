@@ -104,7 +104,7 @@ fn main() -> Result<(), Whatever> {
         let mut f = inform::fmt::IndentWriter::new(&mut buffer, indent);
         document::debug_print(&document_store, &mut f, root_idx)
             .whatever_context("Failed to print document")?;
-        println!("{}", buffer);
+        println!("{buffer}");
         return Ok(());
     }
 
@@ -118,7 +118,7 @@ fn main() -> Result<(), Whatever> {
     let mut f = inform::fmt::IndentWriter::new(&mut buffer, indent);
     document::print_resolved(&document_store, &mut f, new_root_idx, false)
         .whatever_context("Failed to print document")?;
-    println!("{}", buffer);
+    println!("{buffer}");
 
     Ok(())
 }
