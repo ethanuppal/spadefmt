@@ -262,9 +262,18 @@ impl DocumentBuilder {
         let mut list = vec![self.text(variant.name.to_string())];
         if let Some(parameter_list) = &variant.args {
             let parameter_list_doc = self.build_parameter_list(parameter_list);
-            list.push(
-                self.try_catch(parameter_list_doc.0, parameter_list_doc.1),
-            );
+            list.extend([
+                self.text(" {"),
+                self.try_catch(
+                    self.list([
+                        self.text(" "),
+                        parameter_list_doc.0,
+                        self.text(" "),
+                    ]),
+                    parameter_list_doc.1,
+                ),
+                self.text("}"),
+            ]);
         }
         self.list(list)
     }
@@ -909,6 +918,8 @@ impl DocumentBuilder {
         ])
     }
 
+    /// Returns a (try, catch) pair of documents for formatting the given
+    /// `parameter_list`.
     pub fn build_parameter_list(
         &self,
         parameter_list: &Loc<ast::ParameterList>,

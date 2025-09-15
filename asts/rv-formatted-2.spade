@@ -47,7 +47,7 @@ impl<T> Rv<T> {
         set self.ready = true;
     }
 }
-enum U8SplitState { Empty, Halfval: uint<8>, Fullval: uint<16> }
+enum U8SplitState { Empty, Half { val: uint<8> }, Full { val: uint<16> } }
 impl Rv<uint<16>> {
     entity split_to_u8(self, clk: clock, rst: bool) -> Rv<uint<8>> {
         let ds = inst new_mut_wire();
