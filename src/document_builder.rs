@@ -78,71 +78,61 @@ can_build!(AstParameter: build_parameter);
 can_build!(ast::EnumVariant: build_enum_variant);
 
 pub trait HasLineNumber {
-    fn line_number(
-        &self,
-        builder: &DocumentBuilder,
-        file: &SimpleFile<String, String>,
-    ) -> usize;
+    fn line_index(&self, builder: &DocumentBuilder) -> usize;
 }
 
 impl HasLineNumber for Span {
-    fn line_number(
-        &self,
-        _builder: &DocumentBuilder,
-        file: &SimpleFile<String, String>,
-    ) -> usize {
-        file.line_index((), self.start().to_usize())
+    fn line_index(&self, builder: &DocumentBuilder) -> usize {
+        builder
+            .file
+            .borrow()
+            .unwrap()
+            .line_index((), self.start().to_usize())
             .expect("span was somehow not from the file it came from")
     }
 }
 
 impl<T> HasLineNumber for Loc<T> {
-    fn line_number(
-        &self,
-        builder: &DocumentBuilder,
-        file: &SimpleFile<String, String>,
-    ) -> usize {
-        self.span.line_number(builder, file)
+    fn line_index(&self, builder: &DocumentBuilder) -> usize {
+        self.span.line_index(builder)
     }
 }
 
 impl HasLineNumber for ast::EnumVariant {
-    fn line_number(
-        &self,
-        builder: &DocumentBuilder,
-        file: &SimpleFile<String, String>,
-    ) -> usize {
-        self.name.line_number(builder, file)
+    fn line_index(&self, builder: &DocumentBuilder) -> usize {
+        self.name.line_index(builder)
     }
 }
 
 impl HasLineNumber for ast::NamedArgument {
-    fn line_number(
-        &self,
-        builder: &DocumentBuilder,
-        file: &SimpleFile<String, String>,
-    ) -> usize {
+    fn line_index(&self, builder: &DocumentBuilder) -> usize {
         match self {
             ast::NamedArgument::Full(name, _)
-            | ast::NamedArgument::Short(name) => {
-                name.line_number(builder, file)
-            }
+            | ast::NamedArgument::Short(name) => name.line_index(builder),
         }
     }
 }
 
 impl HasLineNumber for AstParameter {
-    fn line_number(
-        &self,
-        builder: &DocumentBuilder,
-        file: &SimpleFile<String, String>,
-    ) -> usize {
+    fn line_index(&self, builder: &DocumentBuilder) -> usize {
         self.0
              .0
             .first()
             .map(|first| first.span)
             .unwrap_or(self.1.span)
-            .line_number(builder, file)
+            .line_index(builder)
+    }
+}
+
+fn span_of_item(item: &ast::Item) -> Span {
+    match item {
+        spade_ast::Item::Unit(unit) => unit.span,
+        spade_ast::Item::TraitDef(trait_definition) => trait_definition.span,
+        spade_ast::Item::Type(ty) => ty.span,
+        spade_ast::Item::ExternalMod(external_module) => external_module.span,
+        spade_ast::Item::Module(module) => module.span,
+        spade_ast::Item::Use(use_) => use_.span,
+        spade_ast::Item::ImplBlock(impl_block) => impl_block.span,
     }
 }
 
@@ -158,14 +148,21 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_root(
         self,
         root: &ast::ModuleBody,
-        file: &SimpleFile<String, String>,
+        file: &'code SimpleFile<String, String>,
     ) -> (InternedDocumentStore, DocumentIdx) {
+        self.file.replace(Some(file));
         let mut list = vec![];
+        let mut last_line_index = 0;
         for (i, item) in root.members.iter().enumerate() {
+            let item_line_index = span_of_item(item).line_index(&self);
             if i > 0 {
+                if last_line_index < item_line_index - 1 {
+                    list.push(self.newline());
+                }
                 list.push(self.newline());
             }
             list.push(self.build_item(item));
+            last_line_index = item_line_index;
         }
         let idx = self.list(list);
         (self.inner.take(), idx)
@@ -356,7 +353,7 @@ impl<'code> DocumentBuilder<'code> {
             self.newline(),
             self.nest(self.build_module_body(&item.body), self.indent),
             self.newline(),
-            self.text("}}"),
+            self.text("}"),
         ])
     }
 
@@ -365,12 +362,17 @@ impl<'code> DocumentBuilder<'code> {
         body: &Loc<ast::ModuleBody>,
     ) -> DocumentIdx {
         let mut list = vec![];
+        let mut last_line_index = 0;
         for (i, item) in body.members.iter().enumerate() {
+            let item_line_index = span_of_item(item).line_index(self);
             if i > 0 {
-                list.push(self.newline());
+                if last_line_index < item_line_index - 1 {
+                    list.push(self.newline());
+                }
                 list.push(self.newline());
             }
             list.push(self.build_item(item));
+            last_line_index = item_line_index;
         }
         self.list(list)
     }
@@ -689,9 +691,15 @@ impl<'code> DocumentBuilder<'code> {
 
                     let mut nest = vec![];
 
-                    for statement in &block.statements {
+                    let mut last_line_index = 0;
+                    for (i, statement) in block.statements.iter().enumerate() {
+                        let item_line_index = statement.line_index(self);
+                        if i > 0 && last_line_index < item_line_index - 1 {
+                            nest.push(self.newline());
+                        }
                         nest.push(self.build_statement(statement));
                         nest.push(self.newline());
+                        last_line_index = item_line_index;
                     }
 
                     if let Some(result) = &block.result {
@@ -1060,18 +1068,22 @@ impl<'code> DocumentBuilder<'code> {
         let between = between.into();
 
         let mut list = vec![];
-        for (i, item) in contents
+        let mut last_line_index = 0;
+        for (i, (item, item_line_index)) in contents
             .into_iter()
-            .map(|item| item.build(self))
+            .map(|item| (item.build(self), item.line_index(self)))
             .enumerate()
         {
-            // item.l
             if i > 0 {
                 if let Some(ref between) = between {
                     list.extend([self.token(between.clone()), self.newline()]);
                 }
+                if last_line_index < item_line_index - 1 {
+                    list.push(self.newline());
+                }
             }
             list.push(item);
+            last_line_index = item_line_index;
         }
         let doc_contents = self.list(list);
         let mut nest_list =

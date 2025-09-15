@@ -123,8 +123,14 @@ fn main() -> Result<(), Whatever> {
 
     let mut buffer = String::new();
     let mut f = inform::fmt::IndentWriter::new(&mut buffer, indent);
-    document::print_resolved(&document_store, &mut f, new_root_idx, false)
-        .whatever_context("Failed to print document")?;
+    document::print_resolved(
+        &document_store,
+        &mut f,
+        new_root_idx,
+        false,
+        &mut false,
+    )
+    .whatever_context("Failed to print document")?;
     println!("{buffer}");
 
     Ok(())
