@@ -14,16 +14,19 @@
 use std::cell::RefCell;
 
 use spade_ast as ast;
+use spade_codespan_reporting::files::{Files, SimpleFile};
 use spade_common::{
-    location_info::Loc,
+    location_info::{Loc, WithLocation},
     name::{Identifier, Path},
 };
+use spade_diagnostics::codespan::Span;
 use spade_parser::lexer;
 
 use crate::document::{Document, DocumentIdx, InternedDocumentStore};
 
-pub struct DocumentBuilder {
+pub struct DocumentBuilder<'code> {
     indent: isize,
+    file: RefCell<Option<&'code SimpleFile<String, String>>>,
     inner: RefCell<InternedDocumentStore>,
 }
 
@@ -31,9 +34,9 @@ pub trait BuildAsDocument {
     fn build(&self, builder: &DocumentBuilder) -> DocumentIdx;
 }
 
-impl BuildAsDocument for DocumentIdx {
+impl BuildAsDocument for Loc<DocumentIdx> {
     fn build(&self, _builder: &DocumentBuilder) -> DocumentIdx {
-        *self
+        self.inner
     }
 }
 
@@ -72,14 +75,82 @@ pub type AstParameter =
 
 can_build!(AstParameter: build_parameter);
 
-// pub type EnumVariant = (Loc<Identifier>, Option<Loc<ast::ParameterList>>);
-
 can_build!(ast::EnumVariant: build_enum_variant);
 
-impl DocumentBuilder {
+pub trait HasLineNumber {
+    fn line_number(
+        &self,
+        builder: &DocumentBuilder,
+        file: &SimpleFile<String, String>,
+    ) -> usize;
+}
+
+impl HasLineNumber for Span {
+    fn line_number(
+        &self,
+        _builder: &DocumentBuilder,
+        file: &SimpleFile<String, String>,
+    ) -> usize {
+        file.line_index((), self.start().to_usize())
+            .expect("span was somehow not from the file it came from")
+    }
+}
+
+impl<T> HasLineNumber for Loc<T> {
+    fn line_number(
+        &self,
+        builder: &DocumentBuilder,
+        file: &SimpleFile<String, String>,
+    ) -> usize {
+        self.span.line_number(builder, file)
+    }
+}
+
+impl HasLineNumber for ast::EnumVariant {
+    fn line_number(
+        &self,
+        builder: &DocumentBuilder,
+        file: &SimpleFile<String, String>,
+    ) -> usize {
+        self.name.line_number(builder, file)
+    }
+}
+
+impl HasLineNumber for ast::NamedArgument {
+    fn line_number(
+        &self,
+        builder: &DocumentBuilder,
+        file: &SimpleFile<String, String>,
+    ) -> usize {
+        match self {
+            ast::NamedArgument::Full(name, _)
+            | ast::NamedArgument::Short(name) => {
+                name.line_number(builder, file)
+            }
+        }
+    }
+}
+
+impl HasLineNumber for AstParameter {
+    fn line_number(
+        &self,
+        builder: &DocumentBuilder,
+        file: &SimpleFile<String, String>,
+    ) -> usize {
+        self.0
+             .0
+            .first()
+            .map(|first| first.span)
+            .unwrap_or(self.1.span)
+            .line_number(builder, file)
+    }
+}
+
+impl<'code> DocumentBuilder<'code> {
     pub fn new(indent: isize) -> Self {
         Self {
             indent,
+            file: Default::default(),
             inner: Default::default(),
         }
     }
@@ -87,6 +158,7 @@ impl DocumentBuilder {
     pub fn build_root(
         self,
         root: &ast::ModuleBody,
+        file: &SimpleFile<String, String>,
     ) -> (InternedDocumentStore, DocumentIdx) {
         let mut list = vec![];
         for (i, item) in root.members.iter().enumerate() {
@@ -563,16 +635,19 @@ impl DocumentBuilder {
                             )),
                             self.build_expression(&arm.1),
                         ]);
-                        arm_list.push(self.try_catch(
-                            self.list([
-                                self.flatten(pattern),
-                                self.flatten(case),
-                            ]),
+                        arm_list.push(
                             self.try_catch(
-                                self.list([self.flatten(pattern), case]),
-                                self.list([pattern, case]),
-                            ),
-                        ));
+                                self.list([
+                                    self.flatten(pattern),
+                                    self.flatten(case),
+                                ]),
+                                self.try_catch(
+                                    self.list([self.flatten(pattern), case]),
+                                    self.list([pattern, case]),
+                                ),
+                            )
+                            .at_loc(&arm.0),
+                        );
                     }
 
                     let arms_doc =
@@ -977,7 +1052,7 @@ impl DocumentBuilder {
             .add(Document::List(list.into_iter().collect()))
     }
 
-    fn group_raw<'a, B: BuildAsDocument + 'a>(
+    fn group_raw<'a, B: BuildAsDocument + HasLineNumber + 'a>(
         &self,
         contents: impl IntoIterator<Item = &'a B>,
         between: impl Into<Option<lexer::TokenKind>>,
@@ -990,6 +1065,7 @@ impl DocumentBuilder {
             .map(|item| item.build(self))
             .enumerate()
         {
+            // item.l
             if i > 0 {
                 if let Some(ref between) = between {
                     list.extend([self.token(between.clone()), self.newline()]);
@@ -1010,7 +1086,7 @@ impl DocumentBuilder {
         (self.flatten(doc_contents), self.list(nest_list))
     }
 
-    fn group<'a, B: BuildAsDocument + 'a>(
+    fn group<'a, B: BuildAsDocument + HasLineNumber + 'a>(
         &self,
         open: impl Into<String>,
         contents: impl IntoIterator<Item = &'a B>,
