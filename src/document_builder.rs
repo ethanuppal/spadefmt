@@ -279,14 +279,14 @@ impl<'code> DocumentBuilder<'code> {
                     .group_raw(&enum_decl.variants, lexer::TokenKind::Comma);
                 list.extend([
                     self.text(" {"),
-                    self.try_catch(
-                        self.list([
-                            self.text(" "),
-                            options_doc.0,
-                            self.text(" "),
-                        ]),
-                        options_doc.1,
-                    ),
+                    // self.try_catch(
+                    //     self.list([
+                    //         self.text(" "),
+                    //         options_doc.0,
+                    //         self.text(" "),
+                    //     ]),
+                    options_doc.1,
+                    // ),
                     self.text("}"),
                 ]);
                 self.list(list)
@@ -309,14 +309,14 @@ impl<'code> DocumentBuilder<'code> {
                     self.build_parameter_list(&struct_decl.members);
                 list.extend([
                     self.text(" {"),
-                    self.try_catch(
-                        self.list([
-                            self.text(" "),
-                            parameter_list_doc.0,
-                            self.text(" "),
-                        ]),
-                        parameter_list_doc.1,
-                    ),
+                    // self.try_catch(
+                    //     self.list([
+                    //         self.text(" "),
+                    //         parameter_list_doc.0,
+                    //         self.text(" "),
+                    //     ]),
+                    parameter_list_doc.1,
+                    // ),
                     self.text("}"),
                 ]);
                 self.list(list)
