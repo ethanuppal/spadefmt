@@ -1,5 +1,5 @@
 [workspace]
-members = []
+members = ["util/mirgen"]
 resolver = "2"
 
 [workspace.package]

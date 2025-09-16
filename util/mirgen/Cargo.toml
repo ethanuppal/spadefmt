@@ -1,0 +1,21 @@
+[package]
+name = "mirgen"
+authors.workspace = true
+description.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+version.workspace = true
+edition.workspace = true
+readme.workspace = true
+
+[dependencies]
+camino.workspace = true
+snafu.workspace = true
+
+spade-lang.workspace = true
+spade-diagnostics.workspace = true
+spade-parser.workspace = true
+spade-codespan-reporting.workspace = true
+spade-ast.workspace = true
+spade-common.workspace = true
