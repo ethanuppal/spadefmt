@@ -504,6 +504,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "mirgen"
+version = "0.0.0"
+dependencies = [
+ "camino",
+ "snafu",
+ "spade-ast",
+ "spade-codespan-reporting",
+ "spade-common",
+ "spade-diagnostics",
+ "spade-lang",
+ "spade-parser",
+]
+
+[[package]]
 name = "nesty"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
