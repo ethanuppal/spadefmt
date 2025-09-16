@@ -63,14 +63,21 @@ pub fn print_resolved<W: fmt::Write>(
     f: &mut inform::fmt::IndentWriter<W>,
     idx: DocumentIdx,
     flattened: bool,
+    last_was_newline: &mut bool,
 ) -> fmt::Result {
+    let last_was_newline_old = *last_was_newline;
+    *last_was_newline = false;
     match store.get(idx) {
         Document::Newline => {
             if flattened {
-                write!(f, " ")
+                if !last_was_newline_old {
+                    write!(f, " ")?;
+                }
             } else {
-                writeln!(f)
+                writeln!(f)?;
             }
+            *last_was_newline = true;
+            Ok(())
         }
         Document::Text(text) => write!(f, "{text}"),
         Document::Nest(body_idx, by) => {
@@ -80,7 +87,7 @@ pub fn print_resolved<W: fmt::Write>(
             } else {
                 f.decrease_indent();
             }
-            print_resolved(store, f, *body_idx, flattened)?;
+            print_resolved(store, f, *body_idx, flattened, last_was_newline)?;
             if *by > 0 {
                 f.decrease_indent();
             } else {
@@ -89,12 +96,13 @@ pub fn print_resolved<W: fmt::Write>(
             Ok(())
         }
         Document::Flatten(body_idx) => {
-            print_resolved(store, f, *body_idx, true)
+            print_resolved(store, f, *body_idx, true, last_was_newline)
         }
-        Document::List(children) => children
-            .iter()
-            .copied()
-            .try_for_each(|child| print_resolved(store, f, child, flattened)),
+        Document::List(children) => {
+            children.iter().copied().try_for_each(|child| {
+                print_resolved(store, f, child, flattened, last_was_newline)
+            })
+        }
         Document::TryCatch(_, _) => {
             panic!("TryCatch found in resolved document")
         }

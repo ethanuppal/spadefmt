@@ -20,17 +20,20 @@ use std::{
     sync::RwLock,
 };
 
-use snafu::{ResultExt, Whatever, whatever};
+use snafu::{whatever, ResultExt, Whatever};
 pub use spade;
-use spade_codespan_reporting::{files::SimpleFiles, term::termcolor::Buffer};
-use spade_diagnostics::{CodeBundle, DiagHandler, emitter::CodespanEmitter};
+use spade_codespan_reporting::{
+    files::{Files, SimpleFiles},
+    term::termcolor::Buffer,
+};
+use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
 use spade_parser::logos::Logos;
 use spadefmt::{
     cli::Opts,
     config::Config,
     document,
     document_builder::DocumentBuilder,
-    resolve_try_catch::{PrintingContext, resolve_try_catch},
+    resolve_try_catch::{resolve_try_catch, PrintingContext},
 };
 
 #[snafu::report]
@@ -55,7 +58,7 @@ fn main() -> Result<(), Whatever> {
         .whatever_context(format!("Failed to read file at {}", opts.file))?;
 
     let mut files = SimpleFiles::new();
-    files.add(opts.file.to_string(), code.clone());
+    let file_id = files.add(opts.file.to_string(), code.clone());
 
     let diagnostic_handler = DiagHandler::new(Box::new(CodespanEmitter));
 
@@ -70,7 +73,7 @@ fn main() -> Result<(), Whatever> {
     let mut error_handler = spade::error_handling::ErrorHandler::new(
         &mut buffer,
         diagnostic_handler,
-        code_bundle,
+        code_bundle.clone(),
     );
 
     let mut parser = spade_parser::Parser::new(
@@ -89,15 +92,19 @@ fn main() -> Result<(), Whatever> {
         }
     };
 
-    let test_contents = fs::read_to_string("spadefmt.toml")
+    let test_config_contents = fs::read_to_string("spadefmt.toml")
         .whatever_context("test file spadefmt.toml should be there")?;
-    let test_config = toml::from_str::<Config>(&test_contents)
+    let test_config = toml::from_str::<Config>(&test_config_contents)
         .whatever_context("Failed to decode config")?;
 
     let indent = test_config.indent.inner;
-    let (mut document_store, root_idx) =
+
+    let (mut document_store, root_idx) = {
+        let code_bundle_guard = code_bundle.read().unwrap();
+        let file = code_bundle_guard.files.get(file_id).unwrap();
         DocumentBuilder::new(test_config.indent.inner as isize)
-            .build_root(&root);
+            .build_root(&root, file)
+    };
 
     if opts.debug {
         let mut buffer = String::new();
@@ -116,8 +123,14 @@ fn main() -> Result<(), Whatever> {
 
     let mut buffer = String::new();
     let mut f = inform::fmt::IndentWriter::new(&mut buffer, indent);
-    document::print_resolved(&document_store, &mut f, new_root_idx, false)
-        .whatever_context("Failed to print document")?;
+    document::print_resolved(
+        &document_store,
+        &mut f,
+        new_root_idx,
+        false,
+        &mut false,
+    )
+    .whatever_context("Failed to print document")?;
     println!("{buffer}");
 
     Ok(())
