@@ -12,6 +12,7 @@ readme.workspace = true
 [dependencies]
 camino.workspace = true
 snafu.workspace = true
+argh.workspace = true
 
 spade-lang.workspace = true
 spade-diagnostics.workspace = true

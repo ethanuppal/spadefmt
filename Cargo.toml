@@ -29,7 +29,6 @@ toml = "0.9.5"
 derivative = "2.2.0"
 inform = "0.3.4"
 
-
 [package]
 name = "spadefmt"
 authors.workspace = true

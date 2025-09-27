@@ -1,4 +1,4 @@
-// Copyright (C) 2024 Ethan Uppal.
+// Copyright (C) 2025 Ethan Uppal.
 //
 // This file is part of spadefmt.
 //
@@ -16,10 +16,12 @@
 use std::{
     env, fs,
     io::{self, IsTerminal, Write},
+    path::PathBuf,
     rc::Rc,
     sync::RwLock,
 };
 
+use argh::FromArgs;
 use snafu::{whatever, ResultExt, Whatever};
 pub use spade;
 use spade::{Artefacts, ModuleNamespace};
@@ -31,17 +33,32 @@ use spade_common::name::Path;
 use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
 use spade_parser::logos::Logos;
 
+/// Generates MIR from spade code input.
+#[derive(FromArgs)]
+struct Opts {
+    /// include the standard library and its includes in the compilation
+    /// process.
+    #[argh(switch)]
+    use_stdlib: bool,
+
+    /// input filename.
+    #[argh(positional)]
+    file: PathBuf,
+}
+
 #[snafu::report]
 fn main() -> Result<(), Whatever> {
-    let file = env::args().nth(1).expect("missing filename input");
+    let cli_opts: Opts = argh::from_env();
+
+    let filename = cli_opts.file.to_string_lossy().to_string();
 
     const FILE_ID: usize = 0;
 
-    let code = fs::read_to_string(&file)
-        .whatever_context(format!("Failed to read file at {}", file))?;
+    let code = fs::read_to_string(&filename)
+        .whatever_context(format!("Failed to read file at {}", filename))?;
 
     let mut files = SimpleFiles::new();
-    let file_id = files.add(file.to_string(), code.clone());
+    let file_id = files.add(filename.to_string(), code.clone());
 
     let diagnostic_handler = DiagHandler::new(Box::new(CodespanEmitter));
 
@@ -57,9 +74,9 @@ fn main() -> Result<(), Whatever> {
         ModuleNamespace {
             namespace: Path::from_strs(&["mirgen"]),
             base_namespace: Path::from_strs(&["mirgen"]),
-            file: file.clone(),
+            file: filename.clone(),
         },
-        file,
+        filename,
         code,
     );
 
@@ -77,7 +94,12 @@ fn main() -> Result<(), Whatever> {
 
     let Ok(Artefacts {
         flat_mir_entities, ..
-    }) = spade::compile(vec![source], true, opts, diagnostic_handler)
+    }) = spade::compile(
+        vec![source],
+        cli_opts.use_stdlib,
+        opts,
+        diagnostic_handler,
+    )
     else {
         io::stderr()
             .write_all(buffer.as_slice())
