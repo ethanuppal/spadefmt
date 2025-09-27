@@ -14,24 +14,18 @@
 #![forbid(unsafe_code)]
 
 use std::{
-    env, fs,
+    fs,
     io::{self, IsTerminal, Write},
     path::PathBuf,
-    rc::Rc,
-    sync::RwLock,
 };
 
 use argh::FromArgs;
-use snafu::{ResultExt, Whatever, whatever};
+use snafu::{whatever, ResultExt, Whatever};
 pub use spade;
 use spade::{Artefacts, ModuleNamespace};
-use spade_codespan_reporting::{
-    files::{Files, SimpleFiles},
-    term::termcolor::Buffer,
-};
+use spade_codespan_reporting::term::termcolor::Buffer;
 use spade_common::name::Path;
-use spade_diagnostics::{CodeBundle, DiagHandler, emitter::CodespanEmitter};
-use spade_parser::logos::Logos;
+use spade_diagnostics::{emitter::CodespanEmitter, DiagHandler};
 
 /// Generates MIR from spade code input.
 #[derive(FromArgs)]
@@ -52,17 +46,10 @@ fn main() -> Result<(), Whatever> {
 
     let filename = cli_opts.file.to_string_lossy().to_string();
 
-    const FILE_ID: usize = 0;
-
     let code = fs::read_to_string(&filename)
         .whatever_context(format!("Failed to read file at {}", filename))?;
 
-    let mut files = SimpleFiles::new();
-    let file_id = files.add(filename.to_string(), code.clone());
-
     let diagnostic_handler = DiagHandler::new(Box::new(CodespanEmitter));
-
-    let code_bundle = Rc::new(RwLock::new(CodeBundle { files }));
 
     let mut buffer = if !io::stderr().is_terminal() {
         Buffer::no_color()
