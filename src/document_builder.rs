@@ -116,7 +116,7 @@ impl HasLineNumber for ast::NamedArgument {
 impl HasLineNumber for AstParameter {
     fn line_index(&self, builder: &DocumentBuilder) -> usize {
         self.0
-             .0
+            .0
             .first()
             .map(|first| first.span)
             .unwrap_or(self.1.span)
@@ -156,7 +156,7 @@ impl<'code> DocumentBuilder<'code> {
         for (i, item) in root.members.iter().enumerate() {
             let item_line_index = span_of_item(item).line_index(&self);
             if i > 0 {
-                if last_line_index < item_line_index - 1 {
+                if last_line_index + 1 < item_line_index {
                     list.push(self.newline());
                 }
                 list.push(self.newline());
@@ -366,7 +366,7 @@ impl<'code> DocumentBuilder<'code> {
         for (i, item) in body.members.iter().enumerate() {
             let item_line_index = span_of_item(item).line_index(self);
             if i > 0 {
-                if last_line_index < item_line_index - 1 {
+                if last_line_index + 1 < item_line_index {
                     list.push(self.newline());
                 }
                 list.push(self.newline());
@@ -479,15 +479,20 @@ impl<'code> DocumentBuilder<'code> {
                     self.build_expression(&register.clock),
                     self.text(") "),
                     self.build_pattern(&register.pattern),
-                    self.text(" "),
                 ];
 
-                if !register.attributes.0.is_empty()
-                    || register.value_type.is_some()
-                    || register.initial.is_some()
-                {
+                if let Some(value_type) = &register.value_type {
+                    list.extend([
+                        self.text(": "),
+                        self.build_type_spec(value_type),
+                    ]);
+                }
+
+                if !register.attributes.0.is_empty() {
                     todo!()
                 }
+
+                list.push(self.text(" "));
 
                 if let Some(reset) = &register.reset {
                     list.extend([
@@ -495,6 +500,14 @@ impl<'code> DocumentBuilder<'code> {
                         self.build_expression(&reset.0),
                         self.text(": "),
                         self.build_expression(&reset.1),
+                        self.text(") "),
+                    ]);
+                }
+
+                if let Some(initial) = &register.initial {
+                    list.extend([
+                        self.text("initial("),
+                        self.build_expression(&initial),
                         self.text(") "),
                     ]);
                 }
@@ -694,7 +707,7 @@ impl<'code> DocumentBuilder<'code> {
                     let mut last_line_index = 0;
                     for (i, statement) in block.statements.iter().enumerate() {
                         let item_line_index = statement.line_index(self);
-                        if i > 0 && last_line_index < item_line_index - 1 {
+                        if i > 0 && last_line_index + 1 < item_line_index {
                             nest.push(self.newline());
                         }
                         nest.push(self.build_statement(statement));
@@ -1078,7 +1091,7 @@ impl<'code> DocumentBuilder<'code> {
                 if let Some(ref between) = between {
                     list.extend([self.token(between.clone()), self.newline()]);
                 }
-                if last_line_index < item_line_index - 1 {
+                if last_line_index + 1 < item_line_index {
                     list.push(self.newline());
                 }
             }

@@ -178,8 +178,7 @@ pub enum FunctionSignatureStyle {
 }
 
 /// Configures the behavior of `spadefmt`.
-#[derive(Derivative, Deserialize, Debug)]
-#[derivative(Default)]
+#[derive(Default, Deserialize, Debug)]
 pub struct Config {
     /// The maximum line length `spadefmt` should aim for.
     #[serde(default)]
