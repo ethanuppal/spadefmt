@@ -22,7 +22,7 @@ use std::{
 };
 
 use argh::FromArgs;
-use snafu::{whatever, ResultExt, Whatever};
+use snafu::{ResultExt, Whatever, whatever};
 pub use spade;
 use spade::{Artefacts, ModuleNamespace};
 use spade_codespan_reporting::{
@@ -30,7 +30,7 @@ use spade_codespan_reporting::{
     term::termcolor::Buffer,
 };
 use spade_common::name::Path;
-use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
+use spade_diagnostics::{CodeBundle, DiagHandler, emitter::CodespanEmitter};
 use spade_parser::logos::Logos;
 
 /// Generates MIR from spade code input.

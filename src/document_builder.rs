@@ -116,7 +116,7 @@ impl HasLineNumber for ast::NamedArgument {
 impl HasLineNumber for AstParameter {
     fn line_index(&self, builder: &DocumentBuilder) -> usize {
         self.0
-             .0
+            .0
             .first()
             .map(|first| first.span)
             .unwrap_or(self.1.span)
