@@ -34,6 +34,7 @@ pub enum Document {
     Flatten(DocumentIdx),
     List(Vec<DocumentIdx>),
     TryCatch(DocumentIdx, DocumentIdx),
+    Raw(String),
 }
 
 #[derive(Default)]
@@ -159,6 +160,7 @@ pub fn print_resolved<W: fmt::Write>(
         Document::TryCatch(_, _) => {
             panic!("TryCatch found in resolved document")
         }
+        Document::Raw(raw) => write!(f, "{raw}"),
     }
 }
 
@@ -209,5 +211,6 @@ pub fn debug_print<W: fmt::Write>(
             f.decrease_indent();
             write!(f, ")")
         }
+        Document::Raw(raw) => write!(f, "Raw(\"{raw}\")"),
     }
 }
