@@ -13,14 +13,28 @@
 
 use std::{collections::VecDeque, fmt, fmt::Write};
 
+use spade_codespan_reporting::files::{Files, SimpleFile};
 use spade_parser::Comment;
 
 use crate::document::ResolvedPrintingContext;
 
 pub struct CommentToPrint<'parser, 'source> {
-    inner: &'parser Comment,
-    source: &'source str,
-    start_line: usize
+    pub inner: &'parser Comment,
+    pub source: &'source str,
+}
+
+impl CommentToPrint<'_, '_> {
+    fn start_line(&self, file: &SimpleFile<String, String>) -> usize {
+        file.line_index(
+            (),
+            match self.inner {
+                Comment::Line(token) | Comment::Block(token, ..) => {
+                    token.span.start
+                }
+            },
+        )
+        .unwrap()
+    }
 }
 
 pub struct CommentInserter<'parser, 'source> {
@@ -28,7 +42,7 @@ pub struct CommentInserter<'parser, 'source> {
 }
 
 impl<'parser, 'source> CommentInserter<'parser, 'source> {
-    pub fn new(comments: &'parser [Comment], source: &'source str, byte_index_to_line: impl Fn(usize) -> usize) -> Self {
+    pub fn new(comments: &'parser [Comment], source: &'source str) -> Self {
         Self {
             comments: comments
                 .iter()
@@ -43,25 +57,44 @@ impl<'parser, 'source> CommentInserter<'parser, 'source> {
                             &source[start_token.span.start..end_token.span.end]
                         }
                     },
-                    start_line: byte_index_to_line(match comment {
-                Comment::Line(token) |
-                Comment::Block(token, ..) => token.span.start,
-            })
-
                 })
                 .collect(),
         }
     }
 
-    pub fn get_comment(
+    // pub fn get_comment(
+    //     &mut self,
+    //     context: &ResolvedPrintingContext,
+    // ) -> Option<CommentToPrint<'parser, 'source>> {
+    //     if let Some(first) = self.comments.front() && context.line ==
+    // first.start_line {         self.comments.pop_front()
+    //     } else {
+    //         None
+    //     }
+    // }
+
+    pub fn get_comments_temp(
         &mut self,
-        context: &ResolvedPrintingContext,
-    ) -> Option<CommentToPrint<'parser, 'source>> {
-        if let Some(first) = self.comments.front() && context.line == first.start_line {
-            self.comments.pop_front()
-        } else {
-            None
+        file: &SimpleFile<String, String>,
+        start_line_index: usize,
+        end_line_index: usize,
+    ) -> Vec<CommentToPrint<'parser, 'source>> {
+        let mut result = vec![];
+        // commented out because this way we guarantee we don't lose any
+        // comments while let Some(comment) = self.comments.pop_front()
+        // {     if comment.start_line(file) >= start_line_index {
+        //         self.comments.push_front(comment);
+        //         break;
+        //     }
+        // }
+        while let Some(comment) = self.comments.pop_front() {
+            if comment.start_line(file) >= end_line_index {
+                self.comments.push_front(comment);
+                break;
+            }
+            result.push(comment);
         }
+        result
     }
 }
 

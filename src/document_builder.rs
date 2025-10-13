@@ -22,7 +22,10 @@ use spade_common::{
 use spade_diagnostics::codespan::Span;
 use spade_parser::lexer;
 
-use crate::document::{Document, DocumentIdx, InternedDocumentStore};
+use crate::{
+    comment_insertion::CommentInserter,
+    document::{Document, DocumentIdx, InternedDocumentStore},
+};
 
 pub struct DocumentBuilder<'code> {
     indent: isize,
@@ -31,11 +34,19 @@ pub struct DocumentBuilder<'code> {
 }
 
 pub trait BuildAsDocument {
-    fn build(&self, builder: &DocumentBuilder) -> DocumentIdx;
+    fn build<'code>(
+        &self,
+        builder: &DocumentBuilder<'code>,
+        comment_inserter: &mut CommentInserter,
+    ) -> DocumentIdx;
 }
 
 impl BuildAsDocument for Loc<DocumentIdx> {
-    fn build(&self, _builder: &DocumentBuilder) -> DocumentIdx {
+    fn build(
+        &self,
+        _builder: &DocumentBuilder,
+        comment_inserter: &mut CommentInserter,
+    ) -> DocumentIdx {
         self.inner
     }
 }
@@ -46,8 +57,9 @@ macro_rules! can_build {
             fn build(
                 &self,
                 builder: &DocumentBuilder,
+                comment_inserter: &mut CommentInserter,
             ) -> $crate::document::DocumentIdx {
-                builder.$name(self)
+                builder.$name(self, comment_inserter)
             }
         }
 
@@ -55,8 +67,9 @@ macro_rules! can_build {
             fn build(
                 &self,
                 builder: &DocumentBuilder,
+                comment_inserter: &mut CommentInserter,
             ) -> $crate::document::DocumentIdx {
-                builder.$name(self)
+                builder.$name(self, comment_inserter)
             }
         }
     };
@@ -79,6 +92,7 @@ can_build!(ast::EnumVariant: build_enum_variant);
 
 pub trait HasLineNumber {
     fn line_index(&self, builder: &DocumentBuilder) -> usize;
+    fn end_line_index(&self, builder: &DocumentBuilder) -> usize;
 }
 
 impl HasLineNumber for Span {
@@ -90,17 +104,34 @@ impl HasLineNumber for Span {
             .line_index((), self.start().to_usize())
             .expect("span was somehow not from the file it came from")
     }
+
+    fn end_line_index(&self, builder: &DocumentBuilder) -> usize {
+        builder
+            .file
+            .borrow()
+            .unwrap()
+            .line_index((), self.end().to_usize())
+            .expect("span was somehow not from the file it came from")
+    }
 }
 
 impl<T> HasLineNumber for Loc<T> {
     fn line_index(&self, builder: &DocumentBuilder) -> usize {
         self.span.line_index(builder)
     }
+
+    fn end_line_index(&self, builder: &DocumentBuilder) -> usize {
+        self.span.end_line_index(builder)
+    }
 }
 
 impl HasLineNumber for ast::EnumVariant {
     fn line_index(&self, builder: &DocumentBuilder) -> usize {
         self.name.line_index(builder)
+    }
+
+    fn end_line_index(&self, builder: &DocumentBuilder) -> usize {
+        self.name.end_line_index(builder)
     }
 }
 
@@ -111,16 +142,32 @@ impl HasLineNumber for ast::NamedArgument {
             | ast::NamedArgument::Short(name) => name.line_index(builder),
         }
     }
+
+    fn end_line_index(&self, builder: &DocumentBuilder) -> usize {
+        match self {
+            ast::NamedArgument::Full(name, _)
+            | ast::NamedArgument::Short(name) => name.end_line_index(builder),
+        }
+    }
 }
 
 impl HasLineNumber for AstParameter {
     fn line_index(&self, builder: &DocumentBuilder) -> usize {
         self.0
-            .0
+             .0
             .first()
             .map(|first| first.span)
             .unwrap_or(self.1.span)
             .line_index(builder)
+    }
+
+    fn end_line_index(&self, builder: &DocumentBuilder) -> usize {
+        self.0
+             .0
+            .first()
+            .map(|first| first.span)
+            .unwrap_or(self.1.span)
+            .end_line_index(builder)
     }
 }
 
@@ -145,13 +192,44 @@ impl<'code> DocumentBuilder<'code> {
         }
     }
 
+    // this is temporary, since it only works for lines that just contain one
+    // comment
+    fn insert_comment_only_lines(
+        &self,
+        comment_inserter: &mut CommentInserter,
+        start_line_index: usize,
+        end_line_index: usize,
+    ) -> Vec<DocumentIdx> {
+        println!(
+            "getting comments from line {} to {}",
+            start_line_index + 1,
+            end_line_index
+        );
+        comment_inserter
+            .get_comments_temp(
+                self.file.borrow().unwrap(),
+                start_line_index,
+                end_line_index,
+            )
+            .iter()
+            .map(|comment| [self.raw_text(comment.source), self.newline()])
+            .inspect(|_| {
+                println!("got comment");
+            })
+            .flatten()
+            .collect::<Vec<_>>()
+    }
+
     pub fn build_root(
         self,
         root: &ast::ModuleBody,
         file: &'code SimpleFile<String, String>,
+        comment_inserter: &mut CommentInserter,
     ) -> (InternedDocumentStore, DocumentIdx) {
         self.file.replace(Some(file));
+
         let mut list = vec![];
+
         let mut last_line_index = 0;
         for (i, item) in root.members.iter().enumerate() {
             let item_line_index = span_of_item(item).line_index(&self);
@@ -161,30 +239,54 @@ impl<'code> DocumentBuilder<'code> {
                 }
                 list.push(self.newline());
             }
-            list.push(self.build_item(item));
+
+            list.extend(self.insert_comment_only_lines(
+                comment_inserter,
+                last_line_index,
+                item_line_index,
+            ));
+
+            list.push(self.build_item(item, comment_inserter));
             last_line_index = item_line_index;
         }
+
+        list.extend(self.insert_comment_only_lines(
+            comment_inserter,
+            last_line_index,
+            usize::MAX,
+        ));
+
         let idx = self.list(list);
         (self.inner.take(), idx)
     }
 
-    pub fn build_item(&self, item: &ast::Item) -> DocumentIdx {
+    pub fn build_item(
+        &self,
+        item: &ast::Item,
+        comment_inserter: &mut CommentInserter,
+    ) -> DocumentIdx {
         match item {
-            ast::Item::Unit(unit) => self.build_unit(unit),
+            ast::Item::Unit(unit) => self.build_unit(unit, comment_inserter),
             ast::Item::TraitDef(_) => todo!(),
             ast::Item::Type(type_declaration) => {
-                self.build_type_declaration(type_declaration)
+                self.build_type_declaration(type_declaration, comment_inserter)
             }
             ast::Item::ExternalMod(_) => todo!(),
-            ast::Item::Module(module) => self.build_module(module),
+            ast::Item::Module(module) => {
+                self.build_module(module, comment_inserter)
+            }
             ast::Item::Use(use_statement) => self.build_use(use_statement),
             ast::Item::ImplBlock(impl_block) => {
-                self.build_impl_block(impl_block)
+                self.build_impl_block(impl_block, comment_inserter)
             }
         }
     }
 
-    pub fn build_unit(&self, unit: &Loc<ast::Unit>) -> DocumentIdx {
+    pub fn build_unit(
+        &self,
+        unit: &Loc<ast::Unit>,
+        comment_inserter: &mut CommentInserter,
+    ) -> DocumentIdx {
         let mut list = vec![];
 
         list.push(self.build_attribute_list(&unit.head.attributes, true));
@@ -194,7 +296,7 @@ impl<'code> DocumentBuilder<'code> {
             ast::UnitKind::Entity => self.text("entity"),
             ast::UnitKind::Pipeline(depth) => self.list([
                 self.text("pipeline("),
-                self.build_type_expression(depth),
+                self.build_type_expression(depth, comment_inserter),
                 self.text(")"),
             ]),
         });
@@ -207,20 +309,24 @@ impl<'code> DocumentBuilder<'code> {
                 &type_params.inner,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::Gt.as_str(),
+                comment_inserter,
             ));
         }
 
-        let parameter_list_doc = self.build_parameter_list(&unit.head.inputs);
+        let parameter_list_doc =
+            self.build_parameter_list(&unit.head.inputs, comment_inserter);
         let parameter_open = self.token(lexer::TokenKind::OpenParen);
         let parameter_close = self.token(lexer::TokenKind::CloseParen);
 
-        let output_type_doc = if let Some((_, output_type)) =
-            &unit.head.output_type
-        {
-            self.list([self.text(" -> "), self.build_type_spec(output_type)])
-        } else {
-            self.list([])
-        };
+        let output_type_doc =
+            if let Some((_, output_type)) = &unit.head.output_type {
+                self.list([
+                    self.text(" -> "),
+                    self.build_type_spec(output_type, comment_inserter),
+                ])
+            } else {
+                self.list([])
+            };
 
         list.push(self.try_catch(
             self.list([
@@ -250,9 +356,10 @@ impl<'code> DocumentBuilder<'code> {
         }
 
         list.push(match &unit.body {
-            Some(body) => {
-                self.list([self.text(" "), self.build_expression(body)])
-            }
+            Some(body) => self.list([
+                self.text(" "),
+                self.build_expression(body, comment_inserter),
+            ]),
             None => self.text(";"),
         });
 
@@ -262,6 +369,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_type_declaration(
         &self,
         type_declaration: &Loc<ast::TypeDeclaration>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         match &type_declaration.kind {
             ast::TypeDeclKind::Enum(enum_decl) => {
@@ -273,10 +381,14 @@ impl<'code> DocumentBuilder<'code> {
                         &generic_args.inner,
                         lexer::TokenKind::Comma,
                         lexer::TokenKind::Gt.as_str(),
+                        comment_inserter,
                     ));
                 }
-                let options_doc = self
-                    .group_raw(&enum_decl.variants, lexer::TokenKind::Comma);
+                let options_doc = self.group_raw(
+                    &enum_decl.variants,
+                    lexer::TokenKind::Comma,
+                    comment_inserter,
+                );
                 list.extend([
                     self.text(" {"),
                     // self.try_catch(
@@ -303,10 +415,13 @@ impl<'code> DocumentBuilder<'code> {
                         &generic_args.inner,
                         lexer::TokenKind::Comma,
                         lexer::TokenKind::Gt.as_str(),
+                        comment_inserter,
                     ));
                 }
-                let parameter_list_doc =
-                    self.build_parameter_list(&struct_decl.members);
+                let parameter_list_doc = self.build_parameter_list(
+                    &struct_decl.members,
+                    comment_inserter,
+                );
                 list.extend([
                     self.text(" {"),
                     // self.try_catch(
@@ -327,10 +442,12 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_enum_variant(
         &self,
         variant: &ast::EnumVariant,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         let mut list = vec![self.text(variant.name.to_string())];
         if let Some(parameter_list) = &variant.args {
-            let parameter_list_doc = self.build_parameter_list(parameter_list);
+            let parameter_list_doc =
+                self.build_parameter_list(parameter_list, comment_inserter);
             list.extend([
                 self.text(" {"),
                 self.try_catch(
@@ -347,11 +464,18 @@ impl<'code> DocumentBuilder<'code> {
         self.list(list)
     }
 
-    pub fn build_module(&self, item: &Loc<ast::Module>) -> DocumentIdx {
+    pub fn build_module(
+        &self,
+        item: &Loc<ast::Module>,
+        comment_inserter: &mut CommentInserter,
+    ) -> DocumentIdx {
         self.list([
             self.text(format!("mod {} {{", item.name)),
             self.newline(),
-            self.nest(self.build_module_body(&item.body), self.indent),
+            self.nest(
+                self.build_module_body(&item.body, comment_inserter),
+                self.indent,
+            ),
             self.newline(),
             self.text("}"),
         ])
@@ -360,9 +484,11 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_module_body(
         &self,
         body: &Loc<ast::ModuleBody>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         let mut list = vec![];
-        let mut last_line_index = 0;
+        let mut last_line_index = body.line_index(self);
+
         for (i, item) in body.members.iter().enumerate() {
             let item_line_index = span_of_item(item).line_index(self);
             if i > 0 {
@@ -371,9 +497,23 @@ impl<'code> DocumentBuilder<'code> {
                 }
                 list.push(self.newline());
             }
-            list.push(self.build_item(item));
+
+            list.extend(self.insert_comment_only_lines(
+                comment_inserter,
+                last_line_index,
+                item_line_index,
+            ));
+
+            list.push(self.build_item(item, comment_inserter));
             last_line_index = item_line_index;
         }
+
+        list.extend(self.insert_comment_only_lines(
+            comment_inserter,
+            last_line_index,
+            body.span.end_line_index(self),
+        ));
+
         self.list(list)
     }
 
@@ -396,6 +536,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_impl_block(
         &self,
         impl_block: &Loc<ast::ImplBlock>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         let mut list = vec![self.text("impl")];
         if let Some(type_params) = &impl_block.type_params {
@@ -404,16 +545,17 @@ impl<'code> DocumentBuilder<'code> {
                 &type_params.inner,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::Gt.as_str(),
+                comment_inserter,
             ));
         }
         list.push(self.text(" "));
         if let Some(impl_trait) = &impl_block.r#trait {
             list.extend([
-                self.build_trait_spec(impl_trait),
+                self.build_trait_spec(impl_trait, comment_inserter),
                 self.text(" for "),
             ]);
         }
-        list.push(self.build_type_spec(&impl_block.target));
+        list.push(self.build_type_spec(&impl_block.target, comment_inserter));
 
         if !impl_block.where_clauses.is_empty() {
             todo!()
@@ -427,7 +569,7 @@ impl<'code> DocumentBuilder<'code> {
                 if i > 0 {
                     unit_list.push(self.newline());
                 }
-                unit_list.push(self.build_unit(unit))
+                unit_list.push(self.build_unit(unit, comment_inserter))
             }
             list.push(self.nest(self.list(unit_list), self.indent));
             list.push(self.newline());
@@ -451,6 +593,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_statement(
         &self,
         statement: &Loc<ast::Statement>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         let mut list = match &**statement {
             ast::Statement::Label(loc) => todo!(),
@@ -458,15 +601,20 @@ impl<'code> DocumentBuilder<'code> {
             ast::Statement::Binding(binding) => {
                 let mut list = vec![
                     self.text("let "),
-                    self.build_pattern(&binding.pattern),
+                    self.build_pattern(&binding.pattern, comment_inserter),
                 ];
 
                 if let Some(ty) = &binding.ty {
-                    list.extend([self.text(": "), self.build_type_spec(ty)]);
+                    list.extend([
+                        self.text(": "),
+                        self.build_type_spec(ty, comment_inserter),
+                    ]);
                 }
 
                 list.push(self.text(" = "));
-                list.push(self.build_expression(&binding.value));
+                list.push(
+                    self.build_expression(&binding.value, comment_inserter),
+                );
 
                 list
             }
@@ -476,15 +624,15 @@ impl<'code> DocumentBuilder<'code> {
             ast::Statement::Register(register) => {
                 let mut list = vec![
                     self.text("reg("),
-                    self.build_expression(&register.clock),
+                    self.build_expression(&register.clock, comment_inserter),
                     self.text(") "),
-                    self.build_pattern(&register.pattern),
+                    self.build_pattern(&register.pattern, comment_inserter),
                 ];
 
                 if let Some(value_type) = &register.value_type {
                     list.extend([
                         self.text(": "),
-                        self.build_type_spec(value_type),
+                        self.build_type_spec(value_type, comment_inserter),
                     ]);
                 }
 
@@ -497,9 +645,9 @@ impl<'code> DocumentBuilder<'code> {
                 if let Some(reset) = &register.reset {
                     list.extend([
                         self.text("reset("),
-                        self.build_expression(&reset.0),
+                        self.build_expression(&reset.0, comment_inserter),
                         self.text(": "),
-                        self.build_expression(&reset.1),
+                        self.build_expression(&reset.1, comment_inserter),
                         self.text(") "),
                     ]);
                 }
@@ -507,23 +655,23 @@ impl<'code> DocumentBuilder<'code> {
                 if let Some(initial) = &register.initial {
                     list.extend([
                         self.text("initial("),
-                        self.build_expression(&initial),
+                        self.build_expression(&initial, comment_inserter),
                         self.text(") "),
                     ]);
                 }
 
                 list.extend([
                     self.text("= "),
-                    self.build_expression(&register.value),
+                    self.build_expression(&register.value, comment_inserter),
                 ]);
 
                 list
             }
             ast::Statement::Set { target, value } => vec![
                 self.text("set "),
-                self.build_expression(target),
+                self.build_expression(target, comment_inserter),
                 self.text(" = "),
-                self.build_expression(value),
+                self.build_expression(value, comment_inserter),
             ],
             ast::Statement::Assert(loc) => todo!(),
             ast::Statement::Expression(loc) => todo!(),
@@ -535,6 +683,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_expression(
         &self,
         expression: &Loc<ast::Expression>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         match &**expression {
             ast::Expression::Identifier(path) => self.build_path(path),
@@ -556,6 +705,7 @@ impl<'code> DocumentBuilder<'code> {
                 array_literal,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::CloseBracket.as_str(),
+                comment_inserter,
             ),
             ast::Expression::ArrayShorthandLiteral(loc, loc1) => todo!(),
             ast::Expression::Index(loc, loc1) => todo!(),
@@ -565,10 +715,11 @@ impl<'code> DocumentBuilder<'code> {
                 items,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::CloseParen.as_str(),
+                comment_inserter,
             ),
             ast::Expression::TupleIndex(loc, loc1) => todo!(),
             ast::Expression::FieldAccess(parent, field) => self.list([
-                self.build_expression(parent),
+                self.build_expression(parent, comment_inserter),
                 self.text(format!(".{field}")),
             ]),
             ast::Expression::CreatePorts => todo!(),
@@ -583,16 +734,18 @@ impl<'code> DocumentBuilder<'code> {
                     ast::CallKind::Entity(_) => vec![self.text("inst ")],
                     ast::CallKind::Pipeline(_, latency) => vec![
                         self.text("inst("),
-                        self.build_type_expression(latency),
+                        self.build_type_expression(latency, comment_inserter),
                         self.text(") "),
                     ],
                 };
 
                 list.push(self.build_path(callee));
                 if let Some(turbofish) = turbofish {
-                    list.push(self.build_turbofish(turbofish));
+                    list.push(
+                        self.build_turbofish(turbofish, comment_inserter),
+                    );
                 }
-                list.push(self.build_argument_list(args));
+                list.push(self.build_argument_list(args, comment_inserter));
 
                 self.list(list)
             }
@@ -604,7 +757,7 @@ impl<'code> DocumentBuilder<'code> {
                 turbofish,
             } => {
                 let mut list = vec![
-                    self.build_expression(target),
+                    self.build_expression(target, comment_inserter),
                     self.token(lexer::TokenKind::Dot),
                 ];
                 list.extend(match kind {
@@ -612,7 +765,7 @@ impl<'code> DocumentBuilder<'code> {
                     ast::CallKind::Entity(_) => vec![self.text("inst ")],
                     ast::CallKind::Pipeline(_, latency) => vec![
                         self.text("inst("),
-                        self.build_type_expression(latency),
+                        self.build_type_expression(latency, comment_inserter),
                         self.text(") "),
                     ],
                 });
@@ -620,35 +773,38 @@ impl<'code> DocumentBuilder<'code> {
                 list.push(self.text(name.to_string()));
 
                 if let Some(turbofish) = turbofish {
-                    list.push(self.build_turbofish(turbofish))
+                    list.push(self.build_turbofish(turbofish, comment_inserter))
                 }
 
-                list.push(self.build_argument_list(args));
+                list.push(self.build_argument_list(args, comment_inserter));
 
                 self.list(list)
             }
             ast::Expression::If(condition, true_branch, false_branch) => self
                 .list([
                     self.text("if "),
-                    self.build_expression(condition),
+                    self.build_expression(condition, comment_inserter),
                     self.text(" "),
-                    self.build_expression(true_branch),
+                    self.build_expression(true_branch, comment_inserter),
                     self.text(" else "),
-                    self.build_expression(false_branch),
+                    self.build_expression(false_branch, comment_inserter),
                 ]),
             ast::Expression::Match(against, arms) => {
-                let mut list =
-                    vec![self.text("match "), self.build_expression(against)];
+                let mut list = vec![
+                    self.text("match "),
+                    self.build_expression(against, comment_inserter),
+                ];
                 if !arms.is_empty() {
                     let mut arm_list = vec![];
                     for arm in &arms.inner {
-                        let pattern = self.build_pattern(&arm.0);
+                        let pattern =
+                            self.build_pattern(&arm.0, comment_inserter);
                         let case = self.list([
                             self.text(format!(
                                 " {} ",
                                 lexer::TokenKind::FatArrow.as_str()
                             )),
-                            self.build_expression(&arm.1),
+                            self.build_expression(&arm.1, comment_inserter),
                         ]);
                         arm_list.push(
                             self.try_catch(
@@ -665,8 +821,11 @@ impl<'code> DocumentBuilder<'code> {
                         );
                     }
 
-                    let arms_doc =
-                        self.group_raw(&arm_list, lexer::TokenKind::Comma);
+                    let arms_doc = self.group_raw(
+                        &arm_list,
+                        lexer::TokenKind::Comma,
+                        comment_inserter,
+                    );
                     list.extend([
                         self.text(" {"),
                         self.try_catch(
@@ -686,13 +845,13 @@ impl<'code> DocumentBuilder<'code> {
             ast::Expression::UnaryOperator(unary_operator, inner) => {
                 self.list([
                     self.text(unary_operator.to_string()),
-                    self.build_expression(inner),
+                    self.build_expression(inner, comment_inserter),
                 ])
             }
             ast::Expression::BinaryOperator(left, op, right) => self.list([
-                self.build_expression(left),
+                self.build_expression(left, comment_inserter),
                 self.text(format!(" {op} ")),
-                self.build_expression(right),
+                self.build_expression(right, comment_inserter),
             ]),
             ast::Expression::Block(block) => {
                 let mut list = vec![self.token(lexer::TokenKind::OpenBrace)];
@@ -704,19 +863,30 @@ impl<'code> DocumentBuilder<'code> {
 
                     let mut nest = vec![];
 
-                    let mut last_line_index = 0;
+                    let mut last_line_index = expression.line_index(self);
                     for (i, statement) in block.statements.iter().enumerate() {
                         let item_line_index = statement.line_index(self);
                         if i > 0 && last_line_index + 1 < item_line_index {
                             nest.push(self.newline());
                         }
-                        nest.push(self.build_statement(statement));
+
+                        nest.extend(self.insert_comment_only_lines(
+                            comment_inserter,
+                            last_line_index,
+                            item_line_index,
+                        ));
+
+                        nest.push(
+                            self.build_statement(statement, comment_inserter),
+                        );
                         nest.push(self.newline());
                         last_line_index = item_line_index;
                     }
 
                     if let Some(result) = &block.result {
-                        nest.push(self.build_expression(result));
+                        nest.push(
+                            self.build_expression(result, comment_inserter),
+                        );
                         nest.push(self.newline());
                     }
 
@@ -737,7 +907,7 @@ impl<'code> DocumentBuilder<'code> {
             ast::Expression::StrLiteral(loc) => todo!(),
             ast::Expression::Parenthesized(inner) => self.list([
                 self.token(lexer::TokenKind::OpenParen),
-                self.build_expression(inner),
+                self.build_expression(inner, comment_inserter),
                 self.token(lexer::TokenKind::CloseParen),
             ]),
             ast::Expression::Lambda {
@@ -753,16 +923,18 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_turbofish(
         &self,
         turbofish: &Loc<ast::TurbofishInner>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         match &**turbofish {
             ast::TurbofishInner::Named(vec) => todo!(),
             ast::TurbofishInner::Positional(arguments) => self.list([
-                self.text("::"),
+                self.token(lexer::TokenKind::PathSeparator),
                 self.group(
                     lexer::TokenKind::Lt.as_str(),
                     arguments,
                     lexer::TokenKind::Comma,
                     lexer::TokenKind::Gt.as_str(),
+                    comment_inserter,
                 ),
             ]),
         }
@@ -771,6 +943,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_argument_list(
         &self,
         argument_list: &Loc<ast::ArgumentList>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         match &**argument_list {
             ast::ArgumentList::Positional(arguments) => self.group(
@@ -778,12 +951,14 @@ impl<'code> DocumentBuilder<'code> {
                 arguments,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::CloseParen.as_str(),
+                comment_inserter,
             ),
             ast::ArgumentList::Named(named_arguments) => self.group(
                 "$(",
                 named_arguments,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::CloseParen.as_str(),
+                comment_inserter,
             ),
         }
     }
@@ -791,17 +966,22 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_named_argument(
         &self,
         named_argument: &ast::NamedArgument,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         match named_argument {
             ast::NamedArgument::Full(name, current) => self.list([
                 self.text(format!("{name}: ")),
-                self.build_expression(current),
+                self.build_expression(current, comment_inserter),
             ]),
             ast::NamedArgument::Short(name) => self.text(name.to_string()),
         }
     }
 
-    pub fn build_pattern(&self, pattern: &Loc<ast::Pattern>) -> DocumentIdx {
+    pub fn build_pattern(
+        &self,
+        pattern: &Loc<ast::Pattern>,
+        comment_inserter: &mut CommentInserter,
+    ) -> DocumentIdx {
         match &**pattern {
             ast::Pattern::Integer(int_literal) => {
                 self.text(int_literal.to_string())
@@ -815,11 +995,12 @@ impl<'code> DocumentBuilder<'code> {
                 tuple,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::CloseParen.as_str(),
+                comment_inserter,
             ),
             ast::Pattern::Array(vec) => todo!(),
             ast::Pattern::Type(name, argument_pattern) => self.list([
                 self.build_path(name),
-                self.build_argument_pattern(argument_pattern),
+                self.build_argument_pattern(argument_pattern, comment_inserter),
             ]),
         }
     }
@@ -827,6 +1008,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_argument_pattern(
         &self,
         argument_pattern: &Loc<ast::ArgumentPattern>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         match &**argument_pattern {
             ast::ArgumentPattern::Named(vec) => todo!(),
@@ -835,6 +1017,7 @@ impl<'code> DocumentBuilder<'code> {
                 tuple,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::CloseParen.as_str(),
+                comment_inserter,
             ),
         }
     }
@@ -842,14 +1025,15 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_type_expression(
         &self,
         type_expression: &Loc<ast::TypeExpression>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         match &**type_expression {
             ast::TypeExpression::TypeSpec(type_spec) => {
-                self.build_type_spec(type_spec)
+                self.build_type_spec(type_spec, comment_inserter)
             }
             ast::TypeExpression::Integer(value) => self.text(value.to_string()),
             ast::TypeExpression::ConstGeneric(expression) => {
-                self.build_expression(expression)
+                self.build_expression(expression, comment_inserter)
             }
             ast::TypeExpression::String(string) => todo!(),
         }
@@ -858,6 +1042,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_type_spec(
         &self,
         type_spec: &Loc<ast::TypeSpec>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         match &**type_spec {
             ast::TypeSpec::Tuple(elements) => self.group(
@@ -865,13 +1050,15 @@ impl<'code> DocumentBuilder<'code> {
                 elements,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::CloseParen.as_str(),
+                comment_inserter,
             ),
             ast::TypeSpec::Array { inner, size } => self.list([
-                self.text("["),
-                self.build_type_expression(inner),
-                self.text("; "),
-                self.build_type_expression(size),
-                self.text("]"),
+                self.token(lexer::TokenKind::OpenBracket),
+                self.build_type_expression(inner, comment_inserter),
+                self.token(lexer::TokenKind::Semi),
+                self.text(" "),
+                self.build_type_expression(size, comment_inserter),
+                self.token(lexer::TokenKind::CloseBracket),
             ]),
             ast::TypeSpec::Named(path, type_params) => {
                 let mut list = vec![self.build_path(path)];
@@ -881,15 +1068,19 @@ impl<'code> DocumentBuilder<'code> {
                         &params.inner,
                         lexer::TokenKind::Comma,
                         lexer::TokenKind::Gt.as_str(),
+                        comment_inserter,
                     ));
                 }
                 self.list(list)
             }
-            ast::TypeSpec::Inverted(inner) => self
-                .list([self.text("inv "), self.build_type_expression(inner)]),
-            ast::TypeSpec::Wire(inner) => {
-                self.list([self.text("&"), self.build_type_expression(inner)])
-            }
+            ast::TypeSpec::Inverted(inner) => self.list([
+                self.text("inv "),
+                self.build_type_expression(inner, comment_inserter),
+            ]),
+            ast::TypeSpec::Wire(inner) => self.list([
+                self.text("&"),
+                self.build_type_expression(inner, comment_inserter),
+            ]),
             ast::TypeSpec::Wildcard => self.text("_"),
         }
     }
@@ -897,6 +1088,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_type_param(
         &self,
         type_param: &Loc<ast::TypeParam>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         match &**type_param {
             ast::TypeParam::TypeName { name, traits } => {
@@ -918,8 +1110,12 @@ impl<'code> DocumentBuilder<'code> {
                                 )),
                             ])
                         }
-                        flatten_list.push(self.build_trait_spec(trait_spec));
-                        nest_list.push(self.build_trait_spec(trait_spec));
+                        flatten_list.push(
+                            self.build_trait_spec(trait_spec, comment_inserter),
+                        );
+                        nest_list.push(
+                            self.build_trait_spec(trait_spec, comment_inserter),
+                        );
                     }
                     list.extend([
                         self.text(": "),
@@ -940,6 +1136,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_trait_spec(
         &self,
         trait_spec: &Loc<ast::TraitSpec>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         let mut list = vec![self.build_path(&trait_spec.path)];
         if let Some(type_params) = &trait_spec.type_params {
@@ -948,6 +1145,7 @@ impl<'code> DocumentBuilder<'code> {
                 &type_params.inner,
                 lexer::TokenKind::Comma,
                 lexer::TokenKind::Gt.as_str(),
+                comment_inserter,
             ));
         }
         self.list(list)
@@ -1006,11 +1204,15 @@ impl<'code> DocumentBuilder<'code> {
         })
     }
 
-    pub fn build_parameter(&self, parameter: &AstParameter) -> DocumentIdx {
+    pub fn build_parameter(
+        &self,
+        parameter: &AstParameter,
+        comment_inserter: &mut CommentInserter,
+    ) -> DocumentIdx {
         self.list([
             self.build_attribute_list(&parameter.0, false),
             self.text(format!("{}: ", parameter.1)),
-            self.build_type_spec(&parameter.2),
+            self.build_type_spec(&parameter.2, comment_inserter),
         ])
     }
 
@@ -1019,6 +1221,7 @@ impl<'code> DocumentBuilder<'code> {
     pub fn build_parameter_list(
         &self,
         parameter_list: &Loc<ast::ParameterList>,
+        comment_inserter: &mut CommentInserter,
     ) -> (DocumentIdx, DocumentIdx) {
         let mut try_list = vec![];
         let mut catch_list = vec![];
@@ -1030,8 +1233,11 @@ impl<'code> DocumentBuilder<'code> {
                 self.nest(self.text("self,"), self.indent),
             ]);
         }
-        let (try_idx, catch_idx) =
-            self.group_raw(&parameter_list.args, lexer::TokenKind::Comma);
+        let (try_idx, catch_idx) = self.group_raw(
+            &parameter_list.args,
+            lexer::TokenKind::Comma,
+            comment_inserter,
+        );
         try_list.push(try_idx);
         catch_list.push(catch_idx);
         (self.list(try_list), self.list(catch_list))
@@ -1043,6 +1249,10 @@ impl<'code> DocumentBuilder<'code> {
 
     fn text(&self, text: impl Into<String>) -> DocumentIdx {
         self.inner.borrow_mut().add(Document::Text(text.into()))
+    }
+
+    fn raw_text(&self, raw_text: impl Into<String>) -> DocumentIdx {
+        self.inner.borrow_mut().add(Document::Raw(raw_text.into()))
     }
 
     fn token(&self, text: lexer::TokenKind) -> DocumentIdx {
@@ -1077,6 +1287,7 @@ impl<'code> DocumentBuilder<'code> {
         &self,
         contents: impl IntoIterator<Item = &'a B>,
         between: impl Into<Option<lexer::TokenKind>>,
+        comment_inserter: &mut CommentInserter,
     ) -> (DocumentIdx, DocumentIdx) {
         let between = between.into();
 
@@ -1084,7 +1295,9 @@ impl<'code> DocumentBuilder<'code> {
         let mut last_line_index = 0;
         for (i, (item, item_line_index)) in contents
             .into_iter()
-            .map(|item| (item.build(self), item.line_index(self)))
+            .map(|item| {
+                (item.build(self, comment_inserter), item.line_index(self))
+            })
             .enumerate()
         {
             if i > 0 {
@@ -1117,11 +1330,13 @@ impl<'code> DocumentBuilder<'code> {
         contents: impl IntoIterator<Item = &'a B>,
         between: impl Into<Option<lexer::TokenKind>>,
         close: impl Into<String>,
+        comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         let open = open.into();
         let close = close.into();
 
-        let (try_body_idx, catch_body_idx) = self.group_raw(contents, between);
+        let (try_body_idx, catch_body_idx) =
+            self.group_raw(contents, between, comment_inserter);
         let mut try_list = vec![];
         let mut catch_list = vec![];
         //if let Some(open) = open {

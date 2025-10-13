@@ -6,3 +6,14 @@ entity top() {
     /* test 2.5 */
     let b = /* test 4 */ 2;
 }
+
+mod submodule {
+    // nested test 1
+    /* nested test 1.5 */
+    entity top() {
+        // nested test 2
+        let a = 1; // nested test 3
+        /* nested test 2.5 */
+        let b = /* nested test 4 */ 2;
+    }
+}

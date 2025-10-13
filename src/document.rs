@@ -85,25 +85,16 @@ pub fn print_resolved<W: fmt::Write>(
     context: &mut ResolvedPrintingContext,
     flattened: bool,
     last_was_newline: &mut bool,
-    comment_inserter: &mut CommentInserter,
 ) -> fmt::Result {
     let last_was_newline_old = *last_was_newline;
     *last_was_newline = false;
     match store.get(idx) {
         Document::Newline => {
-            let comment_opt = comment_inserter.get_comment(context);
-
             if flattened {
                 if !last_was_newline_old {
                     write!(f, " ")?;
                 }
-                if let Some(comment) = comment_opt {
-                    print_comment_as_block(f, context, comment)?;
-                }
             } else {
-                if let Some(comment) = comment_opt {
-                    print_comment_as_original(f, context, comment)?;
-                }
                 writeln!(f)?;
                 context.advance_lines(1);
             }
@@ -126,7 +117,6 @@ pub fn print_resolved<W: fmt::Write>(
                 context,
                 flattened,
                 last_was_newline,
-                comment_inserter,
             )?;
             if *by > 0 {
                 f.decrease_indent();
@@ -135,15 +125,9 @@ pub fn print_resolved<W: fmt::Write>(
             }
             Ok(())
         }
-        Document::Flatten(body_idx) => print_resolved(
-            store,
-            f,
-            *body_idx,
-            context,
-            true,
-            last_was_newline,
-            comment_inserter,
-        ),
+        Document::Flatten(body_idx) => {
+            print_resolved(store, f, *body_idx, context, true, last_was_newline)
+        }
         Document::List(children) => {
             children.iter().copied().try_for_each(|child| {
                 print_resolved(
@@ -153,7 +137,6 @@ pub fn print_resolved<W: fmt::Write>(
                     context,
                     flattened,
                     last_was_newline,
-                    comment_inserter,
                 )
             })
         }

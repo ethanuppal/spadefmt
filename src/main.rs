@@ -22,10 +22,7 @@ use std::{
 
 use snafu::{whatever, ResultExt, Whatever};
 pub use spade;
-use spade_codespan_reporting::{
-    files::{Files, SimpleFiles},
-    term::termcolor::Buffer,
-};
+use spade_codespan_reporting::{files::SimpleFiles, term::termcolor::Buffer};
 use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
 use spade_parser::logos::Logos;
 use spadefmt::{
@@ -65,13 +62,6 @@ fn main() -> Result<(), Whatever> {
 
     let code_bundle = Rc::new(RwLock::new(CodeBundle { files }));
 
-    let code_bundle_read_guard = code_bundle
-        .read()
-        .expect("Failed to acquire read guard - bug");
-    let file = code_bundle_read_guard.files.get(file_id).whatever_context(
-        "Failed to retrieve file from codespan API that was just added",
-    )?;
-
     let mut buffer = if opts.no_color || !io::stderr().is_terminal() {
         Buffer::no_color()
     } else {
@@ -110,8 +100,11 @@ fn main() -> Result<(), Whatever> {
     let (mut document_store, root_idx) = {
         let code_bundle_guard = code_bundle.read().unwrap();
         let file = code_bundle_guard.files.get(file_id).unwrap();
-        DocumentBuilder::new(test_config.indent.inner as isize)
-            .build_root(&root, file)
+        DocumentBuilder::new(test_config.indent.inner as isize).build_root(
+            &root,
+            file,
+            &mut CommentInserter::new(parser.comments(), &code),
+        )
     };
 
     if opts.debug {
@@ -129,6 +122,9 @@ fn main() -> Result<(), Whatever> {
         &mut PrintingContext::new(test_config.max_width.inner),
     );
 
+    // &mut CommentInserter::new(parser.comments(), &code, |byte_index| {
+    //     file.line_index((), byte_index).unwrap()
+    // }),
     let mut buffer = String::new();
     let mut f = inform::fmt::IndentWriter::new(&mut buffer, indent);
     document::print_resolved(
@@ -138,9 +134,6 @@ fn main() -> Result<(), Whatever> {
         &mut ResolvedPrintingContext::new(),
         false,
         &mut false,
-        &mut CommentInserter::new(parser.comments(), &code, |byte_index| {
-            file.line_index((), byte_index).unwrap()
-        }),
     )
     .whatever_context("Failed to print document")?;
     println!("{buffer}");
