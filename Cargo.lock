@@ -847,7 +847,7 @@ dependencies = [
 [[package]]
 name = "spade-ast"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "itertools",
  "num",
@@ -857,7 +857,7 @@ dependencies = [
 [[package]]
 name = "spade-ast-lowering"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "itertools",
  "local-impl",
@@ -896,7 +896,7 @@ dependencies = [
 [[package]]
 name = "spade-common"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "logos",
  "num",
@@ -908,7 +908,7 @@ dependencies = [
 [[package]]
 name = "spade-diagnostics"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "itertools",
  "spade-codespan",
@@ -919,7 +919,7 @@ dependencies = [
 [[package]]
 name = "spade-hir"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "colored",
  "itertools",
@@ -936,7 +936,7 @@ dependencies = [
 [[package]]
 name = "spade-hir-lowering"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "itertools",
  "local-impl",
@@ -954,7 +954,7 @@ dependencies = [
 [[package]]
 name = "spade-lang"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "bincode",
  "clap",
@@ -987,7 +987,7 @@ dependencies = [
 [[package]]
 name = "spade-macros"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -997,7 +997,7 @@ dependencies = [
 [[package]]
 name = "spade-mir"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "derive-where",
  "indoc",
@@ -1013,7 +1013,7 @@ dependencies = [
 [[package]]
 name = "spade-parser"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "colored",
  "itertools",
@@ -1031,7 +1031,7 @@ dependencies = [
 [[package]]
 name = "spade-typeinference"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "colored",
  "fastrand",
@@ -1049,7 +1049,7 @@ dependencies = [
 [[package]]
 name = "spade-types"
 version = "0.14.0"
-source = "git+https://gitlab.com/spade-lang/spade.git?rev=b8f65d0fc858d8b1a6e852959649630e591e041b#b8f65d0fc858d8b1a6e852959649630e591e041b"
+source = "git+https://gitlab.com/spade-lang/spade.git?rev=8641b6a8cda6dac163bbe41ff32ebe23bfb7197d#8641b6a8cda6dac163bbe41ff32ebe23bfb7197d"
 dependencies = [
  "num",
  "serde",

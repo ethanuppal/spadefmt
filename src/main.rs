@@ -20,20 +20,21 @@ use std::{
     sync::RwLock,
 };
 
-use snafu::{ResultExt, Whatever, whatever};
+use snafu::{whatever, ResultExt, Whatever};
 pub use spade;
 use spade_codespan_reporting::{
     files::{Files, SimpleFiles},
     term::termcolor::Buffer,
 };
-use spade_diagnostics::{CodeBundle, DiagHandler, emitter::CodespanEmitter};
+use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
 use spade_parser::logos::Logos;
 use spadefmt::{
     cli::Opts,
+    comment_insertion::CommentInserter,
     config::Config,
-    document,
+    document::{self, ResolvedPrintingContext},
     document_builder::DocumentBuilder,
-    resolve_try_catch::{PrintingContext, resolve_try_catch},
+    resolve_try_catch::{resolve_try_catch, PrintingContext},
 };
 
 #[snafu::report]
@@ -63,6 +64,13 @@ fn main() -> Result<(), Whatever> {
     let diagnostic_handler = DiagHandler::new(Box::new(CodespanEmitter));
 
     let code_bundle = Rc::new(RwLock::new(CodeBundle { files }));
+
+    let code_bundle_read_guard = code_bundle
+        .read()
+        .expect("Failed to acquire read guard - bug");
+    let file = code_bundle_read_guard.files.get(file_id).whatever_context(
+        "Failed to retrieve file from codespan API that was just added",
+    )?;
 
     let mut buffer = if opts.no_color || !io::stderr().is_terminal() {
         Buffer::no_color()
@@ -127,8 +135,12 @@ fn main() -> Result<(), Whatever> {
         &document_store,
         &mut f,
         new_root_idx,
+        &mut ResolvedPrintingContext::new(),
         false,
         &mut false,
+        &mut CommentInserter::new(parser.comments(), &code, |byte_index| {
+            file.line_index((), byte_index).unwrap()
+        }),
     )
     .whatever_context("Failed to print document")?;
     println!("{buffer}");

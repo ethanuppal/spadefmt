@@ -12,11 +12,16 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     fmt::{self, Write},
 };
 
 use inform::common::IndentWriterCommon;
+use spade_parser::Comment;
+
+use crate::comment_insertion::{
+    print_comment_as_block, print_comment_as_original, CommentInserter,
+};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct DocumentIdx(usize);
@@ -58,25 +63,51 @@ impl InternedDocumentStore {
     }
 }
 
+pub struct ResolvedPrintingContext {
+    pub line: usize,
+}
+
+impl ResolvedPrintingContext {
+    pub fn new() -> Self {
+        Self { line: 0 }
+    }
+
+    pub(crate) fn advance_lines(&mut self, line_delta: usize) {
+        self.line += line_delta;
+    }
+}
+
 pub fn print_resolved<W: fmt::Write>(
     store: &InternedDocumentStore,
     f: &mut inform::fmt::IndentWriter<W>,
     idx: DocumentIdx,
+    context: &mut ResolvedPrintingContext,
     flattened: bool,
     last_was_newline: &mut bool,
+    comment_inserter: &mut CommentInserter,
 ) -> fmt::Result {
     let last_was_newline_old = *last_was_newline;
     *last_was_newline = false;
     match store.get(idx) {
         Document::Newline => {
+            let comment_opt = comment_inserter.get_comment(context);
+
             if flattened {
                 if !last_was_newline_old {
                     write!(f, " ")?;
                 }
+                if let Some(comment) = comment_opt {
+                    print_comment_as_block(f, context, comment)?;
+                }
             } else {
+                if let Some(comment) = comment_opt {
+                    print_comment_as_original(f, context, comment)?;
+                }
                 writeln!(f)?;
+                context.advance_lines(1);
             }
             *last_was_newline = true;
+
             Ok(())
         }
         Document::Text(text) => write!(f, "{text}"),
@@ -87,7 +118,15 @@ pub fn print_resolved<W: fmt::Write>(
             } else {
                 f.decrease_indent();
             }
-            print_resolved(store, f, *body_idx, flattened, last_was_newline)?;
+            print_resolved(
+                store,
+                f,
+                *body_idx,
+                context,
+                flattened,
+                last_was_newline,
+                comment_inserter,
+            )?;
             if *by > 0 {
                 f.decrease_indent();
             } else {
@@ -95,12 +134,26 @@ pub fn print_resolved<W: fmt::Write>(
             }
             Ok(())
         }
-        Document::Flatten(body_idx) => {
-            print_resolved(store, f, *body_idx, true, last_was_newline)
-        }
+        Document::Flatten(body_idx) => print_resolved(
+            store,
+            f,
+            *body_idx,
+            context,
+            true,
+            last_was_newline,
+            comment_inserter,
+        ),
         Document::List(children) => {
             children.iter().copied().try_for_each(|child| {
-                print_resolved(store, f, child, flattened, last_was_newline)
+                print_resolved(
+                    store,
+                    f,
+                    child,
+                    context,
+                    flattened,
+                    last_was_newline,
+                    comment_inserter,
+                )
             })
         }
         Document::TryCatch(_, _) => {

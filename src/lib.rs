@@ -14,6 +14,7 @@
 #![forbid(unsafe_code)]
 
 pub mod cli;
+pub mod comment_insertion;
 pub mod config;
 pub mod document;
 pub mod document_builder;
