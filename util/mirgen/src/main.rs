@@ -20,12 +20,12 @@ use std::{
 };
 
 use argh::FromArgs;
-use snafu::{whatever, ResultExt, Whatever};
+use snafu::{ResultExt, Whatever, whatever};
 pub use spade;
 use spade::{Artefacts, ModuleNamespace};
 use spade_codespan_reporting::term::termcolor::Buffer;
 use spade_common::name::Path;
-use spade_diagnostics::{emitter::CodespanEmitter, DiagHandler};
+use spade_diagnostics::{DiagHandler, emitter::CodespanEmitter};
 
 /// Generates MIR from spade code input.
 #[derive(FromArgs)]

@@ -1,0 +1,12 @@
+entity a() {
+
+    let a = 1;
+
+}
+
+entity a() {
+
+    // test
+    let a = 1;
+
+}

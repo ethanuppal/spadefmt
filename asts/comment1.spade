@@ -1,0 +1,42 @@
+// test 1
+/* test 1.5 */
+entity top() {
+    // test 2
+    let a = 1; // test 3 (same line)
+    /* test 2.5 */
+    let b = /* test 4 */ 2;
+}
+
+mod submodule {
+    // nested test 1
+    /* nested test 1.5 */
+    entity top() {
+        // nested test 2
+        let a = 1; // nested test 3 (same line)
+        /* nested test 2.5 */
+        let b = /* nested test 4 */ 2;
+    }
+}
+
+entity top2() {
+    // A
+    let a = 1;
+
+    // B
+    let b = 2;
+
+    // C
+
+    let c = 3;
+
+    // D
+    // E
+
+    // F
+    // G
+
+    let d = 4;
+    // H
+    let e = 5;
+
+}

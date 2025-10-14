@@ -22,16 +22,14 @@ use std::{
 
 use snafu::{ResultExt, Whatever, whatever};
 pub use spade;
-use spade_codespan_reporting::{
-    files::{Files, SimpleFiles},
-    term::termcolor::Buffer,
-};
+use spade_codespan_reporting::{files::SimpleFiles, term::termcolor::Buffer};
 use spade_diagnostics::{CodeBundle, DiagHandler, emitter::CodespanEmitter};
 use spade_parser::logos::Logos;
 use spadefmt::{
     cli::Opts,
+    comment_insertion::CommentInserter,
     config::Config,
-    document,
+    document::{self, ResolvedPrintingContext},
     document_builder::DocumentBuilder,
     resolve_try_catch::{PrintingContext, resolve_try_catch},
 };
@@ -102,8 +100,11 @@ fn main() -> Result<(), Whatever> {
     let (mut document_store, root_idx) = {
         let code_bundle_guard = code_bundle.read().unwrap();
         let file = code_bundle_guard.files.get(file_id).unwrap();
-        DocumentBuilder::new(test_config.indent.inner as isize)
-            .build_root(&root, file)
+        DocumentBuilder::new(test_config.indent.inner as isize).build_root(
+            &root,
+            file,
+            &mut CommentInserter::new(parser.comments(), &code),
+        )
     };
 
     if opts.debug {
@@ -121,12 +122,16 @@ fn main() -> Result<(), Whatever> {
         &mut PrintingContext::new(test_config.max_width.inner),
     );
 
+    // &mut CommentInserter::new(parser.comments(), &code, |byte_index| {
+    //     file.line_index((), byte_index).unwrap()
+    // }),
     let mut buffer = String::new();
     let mut f = inform::fmt::IndentWriter::new(&mut buffer, indent);
     document::print_resolved(
         &document_store,
         &mut f,
         new_root_idx,
+        &mut ResolvedPrintingContext::new(),
         false,
         &mut false,
     )

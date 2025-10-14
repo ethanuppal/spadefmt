@@ -22,6 +22,7 @@ pub struct PrintingContext {
     flatten: bool,
     trying: bool,
     tainted: bool,
+    just_encountered_raw: bool,
 }
 
 impl PrintingContext {
@@ -38,9 +39,12 @@ impl PrintingContext {
         } else {
             self.applied_indent = false;
         }
-        if self.column > self.max_width {
-            self.tainted = true;
+        if !self.just_encountered_raw {
+            if self.column > self.max_width {
+                self.tainted = true;
+            }
         }
+        self.just_encountered_raw = false;
     }
 
     fn indent(&mut self, by: isize) {
@@ -56,6 +60,18 @@ impl PrintingContext {
         if self.column > self.max_width {
             self.tainted = true;
         }
+        self.just_encountered_raw = false;
+    }
+
+    /// Any [`Self::newline`] encountered directly after a raw push will not
+    /// taint even if the raw push went over the line limit.
+    fn push_raw(&mut self, length: usize) {
+        if !self.applied_indent {
+            self.column = self.current_indent;
+            self.applied_indent = true;
+        }
+        self.column += length;
+        self.just_encountered_raw = true;
     }
 
     fn set_flattened(&mut self) {
@@ -142,6 +158,14 @@ pub fn resolve_try_catch(
                 //println!("\nflattened (now tainted = {})", context.tainted);
                 new_try_body_idx
             }
+        }
+        Document::Raw(raw) => {
+            context.push_raw(
+                raw.rsplit_once('\n')
+                    .map(|(_, last_line)| last_line.len())
+                    .unwrap_or(raw.len()),
+            );
+            idx
         }
     }
 }
