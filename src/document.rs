@@ -20,7 +20,7 @@ use inform::common::IndentWriterCommon;
 use spade_parser::Comment;
 
 use crate::comment_insertion::{
-    print_comment_as_block, print_comment_as_original, CommentInserter,
+    CommentInserter, print_comment_as_block, print_comment_as_original,
 };
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
