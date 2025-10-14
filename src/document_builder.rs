@@ -45,7 +45,7 @@ impl BuildAsDocument for Loc<DocumentIdx> {
     fn build(
         &self,
         _builder: &DocumentBuilder,
-        comment_inserter: &mut CommentInserter,
+        _comment_inserter: &mut CommentInserter,
     ) -> DocumentIdx {
         self.inner
     }
@@ -154,7 +154,7 @@ impl HasLineNumber for ast::NamedArgument {
 impl HasLineNumber for AstParameter {
     fn line_index(&self, builder: &DocumentBuilder) -> usize {
         self.0
-             .0
+            .0
             .first()
             .map(|first| first.span)
             .unwrap_or(self.1.span)
@@ -163,7 +163,7 @@ impl HasLineNumber for AstParameter {
 
     fn end_line_index(&self, builder: &DocumentBuilder) -> usize {
         self.0
-             .0
+            .0
             .first()
             .map(|first| first.span)
             .unwrap_or(self.1.span)
@@ -192,32 +192,47 @@ impl<'code> DocumentBuilder<'code> {
         }
     }
 
-    // this is temporary, since it only works for lines that just contain one
-    // comment
-    fn insert_comment_only_lines(
+    /// Pull comments from `comment_inserter` **exclusively** till
+    /// `end_line_index`.
+    ///
+    /// `update_last_line_index`, if provided, will be set to the last line
+    /// index of the comment if one exists. (If one does not exist, it will not
+    /// be set.)
+    fn pull_comments(
         &self,
         comment_inserter: &mut CommentInserter,
         start_line_index: usize,
         end_line_index: usize,
+        trailing_newline: bool,
+        update_last_line_index: Option<&mut usize>,
     ) -> Vec<DocumentIdx> {
-        println!(
-            "getting comments from line {} to {}",
-            start_line_index + 1,
-            end_line_index
+        let comments = comment_inserter.get_comments_temp(
+            self.file.borrow().unwrap(),
+            start_line_index,
+            end_line_index,
         );
-        comment_inserter
-            .get_comments_temp(
-                self.file.borrow().unwrap(),
-                start_line_index,
-                end_line_index,
-            )
-            .iter()
-            .map(|comment| [self.raw_text(comment.source), self.newline()])
-            .inspect(|_| {
-                println!("got comment");
-            })
-            .flatten()
-            .collect::<Vec<_>>()
+        let file = self.file.borrow().unwrap();
+
+        let mut result = vec![];
+        let mut last_line_index = start_line_index;
+        for comment in &comments {
+            let comment_line_index = comment.start_line(file);
+            if last_line_index + 1 < comment_line_index {
+                result.push(self.newline());
+            }
+            result.extend([self.raw_text(comment.source), self.newline()]);
+            last_line_index = comment.end_line(file);
+        }
+        if !result.is_empty() {
+            if !trailing_newline {
+                result.pop();
+            }
+            if let Some(update_last_line_index) = update_last_line_index {
+                *update_last_line_index =
+                    comments.last().unwrap().end_line(file);
+            }
+        }
+        result
     }
 
     pub fn build_root(
@@ -232,31 +247,36 @@ impl<'code> DocumentBuilder<'code> {
 
         let mut last_line_index = 0;
         for (i, item) in root.members.iter().enumerate() {
-            let item_line_index = span_of_item(item).line_index(&self);
+            let item_span = span_of_item(item);
+            let item_line_index = item_span.line_index(&self);
+
+            list.extend(self.pull_comments(
+                comment_inserter,
+                last_line_index,
+                item_line_index,
+                true,
+                Some(&mut last_line_index),
+            ));
+
             if i > 0 {
                 if last_line_index + 1 < item_line_index {
                     list.push(self.newline());
                 }
                 list.push(self.newline());
             }
-
-            list.extend(self.insert_comment_only_lines(
-                comment_inserter,
-                last_line_index,
-                item_line_index,
-            ));
-
             list.push(self.build_item(item, comment_inserter));
-            last_line_index = item_line_index;
+            last_line_index = item_span.end_line_index(&self);
         }
 
-        list.extend(self.insert_comment_only_lines(
+        list.extend(self.pull_comments(
             comment_inserter,
             last_line_index,
             usize::MAX,
+            true,
+            None,
         ));
 
-        let idx = self.list(list);
+        let idx = self.trim_list(list);
         (self.inner.take(), idx)
     }
 
@@ -490,28 +510,33 @@ impl<'code> DocumentBuilder<'code> {
         let mut last_line_index = body.line_index(self);
 
         for (i, item) in body.members.iter().enumerate() {
-            let item_line_index = span_of_item(item).line_index(self);
+            let item_span = span_of_item(item);
+            let item_line_index = item_span.line_index(self);
+
+            list.extend(self.pull_comments(
+                comment_inserter,
+                last_line_index,
+                item_line_index,
+                true,
+                Some(&mut last_line_index),
+            ));
+
             if i > 0 {
                 if last_line_index + 1 < item_line_index {
                     list.push(self.newline());
                 }
                 list.push(self.newline());
             }
-
-            list.extend(self.insert_comment_only_lines(
-                comment_inserter,
-                last_line_index,
-                item_line_index,
-            ));
-
             list.push(self.build_item(item, comment_inserter));
-            last_line_index = item_line_index;
+            last_line_index = item_span.end_line_index(self);
         }
 
-        list.extend(self.insert_comment_only_lines(
+        list.extend(self.pull_comments(
             comment_inserter,
             last_line_index,
             body.span.end_line_index(self),
+            true,
+            None,
         ));
 
         self.list(list)
@@ -676,7 +701,20 @@ impl<'code> DocumentBuilder<'code> {
             ast::Statement::Assert(loc) => todo!(),
             ast::Statement::Expression(loc) => todo!(),
         };
-        list.push(self.text(";"));
+        list.push(self.token(lexer::TokenKind::Semi));
+
+        let end_of_statement_comments = self.pull_comments(
+            comment_inserter,
+            statement.line_index(self),
+            statement.end_line_index(self) + 1,
+            false,
+            None,
+        );
+        if !end_of_statement_comments.is_empty() {
+            list.push(self.text(" "));
+            list.extend(end_of_statement_comments);
+        }
+
         self.list(list)
     }
 
@@ -866,31 +904,55 @@ impl<'code> DocumentBuilder<'code> {
                     let mut last_line_index = expression.line_index(self);
                     for (i, statement) in block.statements.iter().enumerate() {
                         let item_line_index = statement.line_index(self);
-                        if i > 0 && last_line_index + 1 < item_line_index {
-                            nest.push(self.newline());
-                        }
 
-                        nest.extend(self.insert_comment_only_lines(
+                        nest.extend(self.pull_comments(
                             comment_inserter,
                             last_line_index,
                             item_line_index,
+                            true,
+                            Some(&mut last_line_index),
                         ));
 
+                        if i > 0 && last_line_index + 1 < item_line_index {
+                            nest.push(self.newline());
+                        }
                         nest.push(
                             self.build_statement(statement, comment_inserter),
                         );
                         nest.push(self.newline());
-                        last_line_index = item_line_index;
+                        last_line_index = statement.end_line_index(self);
                     }
 
+                    nest.extend(self.pull_comments(
+                        comment_inserter,
+                        last_line_index,
+                        expression.end_line_index(self),
+                        true,
+                        Some(&mut last_line_index),
+                    ));
+
                     if let Some(result) = &block.result {
+                        if last_line_index + 1 < result.line_index(self) {
+                            nest.push(self.newline());
+                        }
+
                         nest.push(
                             self.build_expression(result, comment_inserter),
                         );
                         nest.push(self.newline());
+
+                        last_line_index = result.end_line_index(self);
                     }
 
-                    list.push(self.nest(self.list(nest), self.indent));
+                    nest.extend(self.pull_comments(
+                        comment_inserter,
+                        last_line_index,
+                        expression.end_line_index(self),
+                        true,
+                        None,
+                    ));
+
+                    list.push(self.nest(self.trim_list(nest), self.indent));
                 }
                 list.push(self.token(lexer::TokenKind::CloseBrace));
 
@@ -1283,6 +1345,24 @@ impl<'code> DocumentBuilder<'code> {
             .add(Document::List(list.into_iter().collect()))
     }
 
+    fn trim_list(
+        &self,
+        list: impl IntoIterator<Item = DocumentIdx>,
+    ) -> DocumentIdx {
+        let mut trimmed = list
+            .into_iter()
+            .skip_while(|idx| *idx == self.newline())
+            .collect::<Vec<_>>();
+        while let Some(last) = trimmed.last()
+            && let Some(penultimate) = trimmed.get(trimmed.len() - 2)
+            && *last == self.newline()
+            && *penultimate == self.newline()
+        {
+            trimmed.pop();
+        }
+        self.inner.borrow_mut().add(Document::List(trimmed))
+    }
+
     fn group_raw<'a, B: BuildAsDocument + HasLineNumber + 'a>(
         &self,
         contents: impl IntoIterator<Item = &'a B>,
@@ -1293,10 +1373,14 @@ impl<'code> DocumentBuilder<'code> {
 
         let mut list = vec![];
         let mut last_line_index = 0;
-        for (i, (item, item_line_index)) in contents
+        for (i, (item, item_line_index, item_end_line_index)) in contents
             .into_iter()
             .map(|item| {
-                (item.build(self, comment_inserter), item.line_index(self))
+                (
+                    item.build(self, comment_inserter),
+                    item.line_index(self),
+                    item.end_line_index(self),
+                )
             })
             .enumerate()
         {
@@ -1309,7 +1393,7 @@ impl<'code> DocumentBuilder<'code> {
                 }
             }
             list.push(item);
-            last_line_index = item_line_index;
+            last_line_index = item_end_line_index;
         }
         let doc_contents = self.list(list);
         let mut nest_list =

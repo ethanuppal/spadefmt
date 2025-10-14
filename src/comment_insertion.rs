@@ -24,12 +24,24 @@ pub struct CommentToPrint<'parser, 'source> {
 }
 
 impl CommentToPrint<'_, '_> {
-    fn start_line(&self, file: &SimpleFile<String, String>) -> usize {
+    pub fn start_line(&self, file: &SimpleFile<String, String>) -> usize {
         file.line_index(
             (),
             match self.inner {
                 Comment::Line(token) | Comment::Block(token, ..) => {
                     token.span.start
+                }
+            },
+        )
+        .unwrap()
+    }
+
+    pub fn end_line(&self, file: &SimpleFile<String, String>) -> usize {
+        file.line_index(
+            (),
+            match self.inner {
+                Comment::Line(token) | Comment::Block(token, ..) => {
+                    token.span.end
                 }
             },
         )
@@ -46,9 +58,9 @@ impl<'parser, 'source> CommentInserter<'parser, 'source> {
         Self {
             comments: comments
                 .iter()
-                .inspect(|comment| {
-                    println!("{comment:?}");
-                })
+                // .inspect(|comment| {
+                //     println!("{comment:?}");
+                // })
                 .map(|comment| CommentToPrint {
                     inner: comment,
                     source: match comment {
@@ -73,6 +85,10 @@ impl<'parser, 'source> CommentInserter<'parser, 'source> {
     //     }
     // }
 
+    // TODO: remove start_line_index, probably won't need it, and it'll be a
+    // good thing to show bugs if comments aren't inserted where they should
+    // rather than just not showing up. this way we don't risk losing comments
+    /// `end_line_index` is an exclusive upper bound.
     pub fn get_comments_temp(
         &mut self,
         file: &SimpleFile<String, String>,
