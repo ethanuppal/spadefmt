@@ -20,10 +20,11 @@ use std::{
     sync::RwLock,
 };
 
-use snafu::{ResultExt, Whatever, whatever};
+use snafu::{OptionExt, ResultExt, Whatever};
 pub use spade;
+use spade::error_handling::Reportable;
 use spade_codespan_reporting::{files::SimpleFiles, term::termcolor::Buffer};
-use spade_diagnostics::{CodeBundle, DiagHandler, emitter::CodespanEmitter};
+use spade_diagnostics::{emitter::CodespanEmitter, CodeBundle, DiagHandler};
 use spade_parser::logos::Logos;
 use spadefmt::{
     cli::Opts,
@@ -31,12 +32,15 @@ use spadefmt::{
     config::Config,
     document::{self, ResolvedPrintingContext},
     document_builder::DocumentBuilder,
-    resolve_try_catch::{PrintingContext, resolve_try_catch},
+    resolve_try_catch::{resolve_try_catch, PrintingContext},
 };
 
 #[snafu::report]
 fn main() -> Result<(), Whatever> {
-    let opts = Opts::from_env();
+    let mut opts = Opts::from_env();
+    opts.no_color |= env::var("NO_COLOR")
+        .map(|var| var.trim() == "1")
+        .unwrap_or(false);
 
     if opts.version {
         println!(
@@ -49,8 +53,6 @@ fn main() -> Result<(), Whatever> {
 
         return Ok(());
     }
-
-    const FILE_ID: usize = 0;
 
     let code = fs::read_to_string(&opts.file)
         .whatever_context(format!("Failed to read file at {}", opts.file))?;
@@ -76,18 +78,15 @@ fn main() -> Result<(), Whatever> {
 
     let mut parser = spade_parser::Parser::new(
         spade_parser::lexer::TokenKind::lexer(&code),
-        FILE_ID,
+        file_id,
     );
 
-    let root = match parser.top_level_module_body() {
-        Ok(root) => root,
-        Err(error) => {
-            error_handler.report(&error);
-            for error in &parser.diags.errors {
-                error_handler.report(error);
-            }
-            whatever!("Exiting due to errors")
-        }
+    let root = {
+        let root_opt =
+            parser.top_level_module_body().or_report(&mut error_handler);
+        error_handler.drain_diag_list(&mut parser.diags);
+        print!("{}", String::from_utf8_lossy(buffer.as_slice()));
+        root_opt.whatever_context("Exiting due to errors")?
     };
 
     let test_config_contents = fs::read_to_string("spadefmt.toml")
